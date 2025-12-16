@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORTEX RUPTURE</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* Crucial for pixel art look */
+        }
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            font-size: 20px;
+            text-shadow: 2px 2px 0px #000;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #sanity-meter {
+            width: 200px;
+            height: 20px;
+            border: 2px solid #0f0;
+            margin-top: 5px;
+            background: #000;
+        }
+        #sanity-fill {
+            width: 100%;
+            height: 100%;
+            background: #0f0;
+            transition: width 0.2s, background-color 0.5s;
+        }
+        #narrator-text {
+            position: absolute;
+            bottom: 10%;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0px 0px 10px red;
+            pointer-events: none;
+            display: none;
+        }
+        .crt-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+        /* Start Screen */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #0f0;
+            z-index: 100;
+        }
+        button {
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            padding: 15px 30px;
+            font-family: 'Courier New';
+            font-size: 20px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover { background: #0f0; color: #000; }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div id="start-screen">
+        <h1 style="font-size: 60px; text-shadow: 4px 4px red;">CORTEX RUPTURE</h1>
+        <p>ARROWS to Move | Z to Shoot | SPACE to Jump</p>
+        <p>Warning: Contains flashing lights and audio glitches.</p>
+        <button onclick="startGame()">ENTER ASYLUM</button>
+    </div>
+
+    <div id="ui-layer">
+        <div>HEALTH: <span id="hp-val">100</span>%</div>
+        <div id="sanity-meter"><div id="sanity-fill"></div></div>
+        <div style="margin-top:5px; font-size: 14px; opacity: 0.7;">DISTANCE TO DAUGHTER: <span id="dist-val">666</span>m</div>
+    </div>
+
+    <div id="narrator-text"></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    // --- AUDIO SYSTEM (Procedural Horror Synths) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        
+        if (type === 'shoot') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        } else if (type === 'hit') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        } else if (type === 'glitch') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(Math.random() * 1000, now);
+            gain.gain.setValueAtTime(0.05, now);
+            osc.start(now);
+            osc.stop(now + 0.05);
+        }
+    }
+
+    // --- GAME ENGINE ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let state = {
+        running: false,
+        frames: 0,
+        player: { x: 50, y: 0, w: 30, h: 50, vx: 0, vy: 0, hp: 100, sanity: 100, grounded: false },
+        bullets: [],
+        enemies: [],
+        particles: [],
+        camX: 0,
+        distance: 666,
+        difficulty: 1
+    };
+
+    const keys = {};
+    const GRAVITY = 0.8;
+    const SPEED = 5;
+    const JUMP = -14;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        state.running = true;
+        state.player.y = canvas.height - 100;
+        loop();
+        narratorLoop();
+    }
+
+    // --- LOGIC ---
+    function update() {
+        if(!state.running) return;
+        state.frames++;
+
+        // Difficulty ramp up
+        if (state.frames % 600 === 0) state.difficulty += 0.5;
+        if (state.frames % 10 === 0 && state.distance > 0) state.distance--;
+
+        // Player Physics
+        if (keys['ArrowLeft']) state.player.vx = -SPEED;
+        else if (keys['ArrowRight']) state.player.vx = SPEED;
+        else state.player.vx = 0;
+
+        if (keys['Space'] && state.player.grounded) {
+            state.player.vy = JUMP;
+            state.player.grounded = false;
+        }
+
+        // Shooting
+        if (keys['KeyZ'] && state.frames % 15 === 0) {
+            state.bullets.push({ x: state.player.x + state.player.w, y: state.player.y + 15, vx: 12, life: 100 });
+            playSound('shoot');
+            state.player.sanity -= 1; // Shooting costs sanity
+        }
+
+        // Apply Physics
+        state.player.vy += GRAVITY;
+        state.player.x += state.player.vx;
+        state.player.y += state.player.vy;
+
+        // Floor Collision
+        const floorY = canvas.height - 100;
+        if (state.player.y + state.player.h > floorY) {
+            state.player.y = floorY - state.player.h;
+            state.player.vy = 0;
+            state.player.grounded = true;
+        }
+
+        // Boundaries
+        if (state.player.x < 0) state.player.x = 0;
+        if (state.player.x > canvas.width - state.player.w) state.player.x = canvas.width - state.player.w;
+
+        // Enemy Spawning
+        if (Math.random() < 0.02 * state.difficulty) {
+            const type = Math.random() > 0.7 ? 'flyer' : 'runner';
+            state.enemies.push({
+                x: canvas.width + 50,
+                y: type === 'runner' ? floorY - 40 : floorY - 150 - Math.random()*100,
+                w: 40, h: 40,
+                vx: -(2 + Math.random() * state.difficulty),
+                type: type,
+                hp: type === 'tank' ? 3 : 1
+            });
+        }
+
+        // Bullets Logic
+        for (let i = state.bullets.length - 1; i >= 0; i--) {
+            let b = state.bullets[i];
+            b.x += b.vx;
+            if (b.x > canvas.width) state.bullets.splice(i, 1);
+        }
+
+        // Enemy Logic
+        for (let i = state.enemies.length - 1; i >= 0; i--) {
+            let e = state.enemies[i];
+            e.x += e.vx;
+            
+            // Player Hit
+            if (rectIntersect(state.player, e)) {
+                state.player.hp -= 10;
+                state.player.sanity -= 10;
+                playSound('hit');
+                shakeScreen(10);
+                state.enemies.splice(i, 1);
+                createParticles(state.player.x, state.player.y, 10, '#f00');
+                continue;
+            }
+
+            // Bullet Hit
+            for (let j = state.bullets.length - 1; j >= 0; j--) {
+                let b = state.bullets[j];
+                if (rectIntersect(b, e)) {
+                    state.enemies.splice(i, 1);
+                    state.bullets.splice(j, 1);
+                    createParticles(e.x, e.y, 8, '#0f0'); // Alien blood
+                    playSound('glitch');
+                    state.player.sanity += 2; // Killing gives false relief
+                    break;
+                }
+            }
+
+            if (e.x < -50) state.enemies.splice(i, 1);
+        }
+
+        // Particles
+        state.particles.forEach((p, index) => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) state.particles.splice(index, 1);
+        });
+
+        // Game Over Check
+        if (state.player.hp <= 0 || state.player.sanity <= 0) {
+            state.running = false;
+            alert("SUBJECT DECEASED. SANITY LEVELS CRITICAL.");
+            location.reload();
+        }
+
+        // Win
+        if (state.distance <= 0) {
+            state.running = false;
+            alert("YOU FOUND HER. (But she doesn't recognize you.)");
+            location.reload();
+        }
+
+        updateUI();
+    }
+
+    function draw() {
+        // Clear (with trail effect based on sanity)
+        ctx.fillStyle = state.player.sanity < 50 ? 'rgba(5, 5, 5, 0.2)' : '#050505';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Floor
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+
+        // Sanity Glitch Effects
+        if (state.player.sanity < 40 && Math.random() > 0.9) {
+            ctx.filter = 'invert(1)';
+        } else {
+            ctx.filter = 'none';
+        }
+
+        // Draw Player
+        ctx.fillStyle = '#0f0'; // Neon Green
+        ctx.fillRect(state.player.x, state.player.y, state.player.w, state.player.h);
+        
+        // Draw Enemies
+        state.enemies.forEach(e => {
+            ctx.fillStyle = e.type === 'flyer' ? '#f0f' : '#f00'; // Magenta/Red
+            ctx.fillRect(e.x, e.y, e.w, e.h);
+            // Draw Glitch Eyes
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(e.x + 5, e.y + 10, 5, 5);
+        });
+
+        // Draw Bullets
+        ctx.fillStyle = '#ff0';
+        state.bullets.forEach(b => ctx.fillRect(b.x, b.y, 8, 4));
+
+        // Draw Particles
+        state.particles.forEach(p => {
+            ctx.fillStyle = p.c;
+            ctx.fillRect(p.x, p.y, 3, 3);
+        });
+    }
+
+    function loop() {
+        if(!state.running) return;
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // --- HELPERS ---
+    function rectIntersect(r1, r2) {
+        return !(r2.x > r1.x + (r1.w || 8) || 
+                 r2.x + r2.w < r1.x || 
+                 r2.y > r1.y + (r1.h || 4) || 
+                 r2.y + r2.h < r1.y);
+    }
+
+    function createParticles(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 20,
+                c: color
+            });
+        }
+    }
+
+    function shakeScreen(amount) {
+        canvas.style.transform = `translate(${Math.random()*amount - amount/2}px, ${Math.random()*amount - amount/2}px)`;
+        setTimeout(() => canvas.style.transform = 'none', 50);
+    }
+
+    function updateUI() {
+        document.getElementById('hp-val').innerText = Math.floor(state.player.hp);
+        const sanFill = document.getElementById('sanity-fill');
+        sanFill.style.width = state.player.sanity + '%';
+        document.getElementById('dist-val').innerText = state.distance;
+        
+        if(state.player.sanity < 30) sanFill.style.backgroundColor = '#f00';
+        else sanFill.style.backgroundColor = '#0f0';
+    }
+
+    // --- NARRATOR SYSTEM ---
+    const lines = [
+        "Why do you keep running?",
+        "There is no daughter.",
+        "The doctor is watching.",
+        "Press 'Z' to give up.",
+        "Look behind you.",
+        "SYSTEM ERROR: HOPE NOT FOUND"
+    ];
+
+    function narratorLoop() {
+        if(!state.running) return;
+        const el = document.getElementById('narrator-text');
+        
+        // Randomly show text
+        setTimeout(() => {
+            el.innerText = lines[Math.floor(Math.random() * lines.length)];
+            el.style.display = 'block';
+            playSound('glitch');
+            setTimeout(() => el.style.display = 'none', 3000);
+            narratorLoop();
+        }, 5000 + Math.random() * 5000);
+    }
+
+</script>
+</body>
+</html>
