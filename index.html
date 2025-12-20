@@ -1,656 +1,764 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>ASYLUM: DIRECTOR'S CUT</title>
-<style>
-  :root{
-    --bg:#050505; --panel:#0d0d12; --text:#a7a7b8; --accent:#7d3cff; --danger:#ff2a2a;
-    --shadow:0 0 20px rgba(0,0,0,0.8);
-  }
-  body{ margin:0; overflow:hidden; background:var(--bg); color:var(--text); font-family:monospace; user-select:none; }
-  canvas{ position:fixed; inset:0; width:100%; height:100%; image-rendering:pixelated; }
-  
-  /* UI Overlay */
-  .gOverlay{ position:fixed; inset:0; display:grid; place-items:center; z-index:50; background:rgba(0,0,0,0.85); backdrop-filter:blur(2px); }
-  .gPanel{ width:min(700px,90vw); background:linear-gradient(180deg,#12121a,#0a0a0f); border:1px solid #333; padding:20px; border-radius:4px; box-shadow:var(--shadow); position:relative; }
-  h1{ margin:0 0 10px 0; font-size:24px; color:#fff; text-shadow:0 0 10px var(--accent); letter-spacing:2px; text-transform:uppercase; }
-  .gBtn{ background:#1a1a22; border:1px solid #444; color:#ddd; padding:10px 20px; cursor:pointer; font:inherit; text-transform:uppercase; transition:0.1s; }
-  .gBtn:hover{ background:var(--accent); color:#000; border-color:var(--accent); }
-  .gRow{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:15px; }
-  input, select{ background:#000; border:1px solid #444; color:#fff; padding:8px; width:100%; font:inherit; box-sizing:border-box; }
-  
-  /* HUD */
-  .gHud{ position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; pointer-events:none; z-index:40; text-shadow:1px 1px 0 #000; }
-  .gBar{ width:160px; height:6px; background:#222; border:1px solid #444; margin-bottom:4px; position:relative; }
-  .gFill{ height:100%; transition:width 0.2s; }
-  .gStat{ font-size:10px; color:#aaa; margin-top:2px; }
-  
-  /* Boss Bar */
-  .bossBar{ position:fixed; bottom:20px; left:20%; right:20%; display:none; z-index:40; }
-  .bossName{ text-align:center; font-size:10px; color:#fff; margin-bottom:4px; text-shadow:0 0 4px #000; }
-  
-  /* CRT Scanlines */
-  .crt{ position:fixed; inset:0; pointer-events:none; z-index:90; background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.1) 50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03)); background-size:100% 2px, 3px 100%; }
-  
-  /* Toast */
-  .toast{ position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); border:1px solid #444; color:#fff; padding:8px 16px; font-size:12px; opacity:0; transition:0.3s; z-index:100; pointer-events:none; }
-  .toast.show{ opacity:1; bottom:40px; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VITAL SIGNS: ZERO // TERMINAL LINK</title>
+    <style>
+        /* --- PROFESSIONAL CSS RESET & CRT STYLING --- */
+        :root {
+            --term-green: #33ff00;
+            --term-red: #ff3333;
+            --term-bg: #050505;
+            --scanline-color: rgba(0, 0, 0, 0.5);
+        }
 
-  /* Leaderboard Table */
-  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
-  th { text-align:left; color:#fff; border-bottom:1px solid #444; padding:4px; }
-  td { padding:4px; border-bottom:1px solid #222; color:#888; }
-</style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--term-bg);
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            cursor: crosshair;
+            user-select: none;
+        }
+
+        /* The Game Container */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The Canvas: Low Res scaled up with sharp pixels */
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            z-index: 1;
+        }
+
+        /* UI Overlay Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            padding: 20px;
+            box-sizing: border-box;
+            text-shadow: 0 0 5px var(--term-green);
+            color: var(--term-green);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* HUD Elements */
+        .hud-top { display: flex; justify-content: space-between; font-weight: bold; font-size: 20px; }
+        .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+        
+        .bar-container { width: 200px; height: 15px; border: 2px solid var(--term-green); background: #001100; margin-bottom: 5px; }
+        .bar-fill { height: 100%; background: var(--term-green); transition: width 0.1s linear; }
+        .bar-fill.critical { background: var(--term-red); box-shadow: 0 0 10px var(--term-red); animation: pulse 0.5s infinite; }
+
+        #log-area {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            width: 400px;
+            height: 150px;
+            overflow: hidden;
+            font-size: 14px;
+            opacity: 0.8;
+            border-left: 2px solid var(--term-green);
+            padding-left: 10px;
+            background: linear-gradient(90deg, rgba(0,20,0,0.5), transparent);
+        }
+
+        /* CRT Effects */
+        .scanlines {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 99;
+        }
+        
+        .vignette {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.8) 90%);
+            pointer-events: none;
+            z-index: 98;
+        }
+
+        .screen-glitch {
+            animation: glitch-anim 0.2s infinite;
+            display: none; /* Toggled by JS */
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(255, 0, 0, 0.1);
+            z-index: 90;
+            pointer-events: none;
+        }
+
+        /* Start Screen */
+        #menu-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: #fff;
+        }
+        
+        h1 { font-size: 64px; margin: 0; text-shadow: 4px 4px 0 #333; letter-spacing: 5px; color: #ddd; }
+        .menu-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            background: transparent;
+            border: 2px solid #fff;
+            color: #fff;
+            font-family: inherit;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .menu-btn:hover { background: #fff; color: #000; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes glitch-anim {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(2px, -2px); }
+            60% { transform: translate(-2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+    </style>
 </head>
 <body>
 
-<div class="crt"></div>
-<div class="toast"></div>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+    <div id="glitch-overlay" class="screen-glitch"></div>
 
-<div class="gHud">
-  <div>
-    <div style="font-size:10px;color:#ff2a2a">HP</div><div class="gBar"><div id="uiHp" class="gFill" style="background:#ff2a2a;width:100%"></div></div>
-    <div style="font-size:10px;color:#7d3cff">SANITY</div><div class="gBar"><div id="uiSan" class="gFill" style="background:#7d3cff;width:100%"></div></div>
-    <div id="uiStatus" class="gStat"></div>
-  </div>
-  <div style="text-align:right">
-    <div id="uiScore" style="font-size:14px;color:#fff">000000</div>
-    <div id="uiMission" class="gStat"></div>
-    <div id="uiMadness" style="color:#ff2a2a;display:none;animation:pulse 0.5s infinite">MADNESS ACTIVE</div>
-  </div>
-</div>
-
-<div class="bossBar" id="bossWrap">
-  <div class="bossName" id="bossName">BOSS</div>
-  <div class="gBar" style="width:100%"><div id="bossFill" class="gFill" style="background:#fff;width:100%"></div></div>
-</div>
-
-<div id="menu" class="gOverlay">
-  <div class="gPanel">
-    <h1>ASYLUM: DIRECTOR'S CUT</h1>
-    <div style="font-size:11px;color:#666;margin-bottom:10px">
-      WASD/ARROWS: Move · SPACE: Jump · MOUSE: Shoot · E: Interact/Secret<br>
-      WARNING: Physics Gore & Glitch Effects Enabled.
+    <div id="menu-screen">
+        <h1>VITAL SIGNS: ZERO</h1>
+        <p style="color: #888;">[ BIO-HAZARD CONTAINMENT PROTOCOL ]</p>
+        <p style="margin-top: 20px; font-size: 14px;">WASD: Move | MOUSE: Aim | CLICK: Fire | R: Reload | F: Flashlight</p>
+        <button class="menu-btn" onclick="Game.init()">INITIALIZE LINK</button>
     </div>
-    <div class="gRow">
-      <div><label>IDENTITY</label><input id="inName" value="PATIENT" maxlength="10"></div>
-      <div><label>MISSION</label><select id="inMission"><option value="SURVIVE_120">Survive 2:00</option><option value="SAVE_CHILD">Save Daughter</option><option value="REACH_EXIT">Reach Exit</option></select></div>
-    </div>
-    <div style="margin-top:20px;display:flex;justify-content:space-between">
-      <button class="gBtn" id="btnScores">LEADERBOARD</button>
-      <button class="gBtn" id="btnStart" style="border-color:#7d3cff;color:#fff">INITIATE THERAPY</button>
-    </div>
-  </div>
-</div>
 
-<div id="scores" class="gOverlay" style="display:none">
-  <div class="gPanel">
-    <h1>PATIENT RECORDS</h1>
-    <div id="scoreList"></div>
-    <div style="margin-top:20px;text-align:right"><button class="gBtn" onclick="document.getElementById('scores').style.display='none'">CLOSE</button></div>
-  </div>
-</div>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div id="sector-info">SECTOR: 7G [DEEP LABS]</div>
+                <div id="ammo-counter">AMMO: --/--</div>
+            </div>
+            
+            <div id="log-area">
+                </div>
 
-<div id="end" class="gOverlay" style="display:none">
-  <div class="gPanel" style="text-align:center">
-    <h1 id="endTitle">SIGNAL LOST</h1>
-    <div id="endBody" style="white-space:pre-wrap;margin:15px 0;line-height:1.4;font-size:12px"></div>
-    <div id="endAutopsy" style="font-size:11px;color:#666;margin-top:10px;text-align:left;border-top:1px solid #333;padding-top:10px"></div>
-    <button class="gBtn" style="margin-top:20px" onclick="location.reload()">REBOOT</button>
-  </div>
-</div>
+            <div class="hud-bottom">
+                <div>
+                    <div>VITAL INTEGRITY</div>
+                    <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
+                    <div>NEURAL COHERENCE</div>
+                    <div class="bar-container"><div id="coherence-bar" class="bar-fill" style="background:#00aaff"></div></div>
+                </div>
+                <div style="text-align: right;">
+                    <div id="threat-level" style="color:red; opacity:0;">THREAT DETECTED</div>
+                    <div>OBJ: PURGE DATA CORE</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script>
-(() => {
-  "use strict";
+/**
+ * VITAL SIGNS: ZERO - Engine Core
+ * A monolithic JS structure simulating a professional ECS-lite architecture.
+ */
 
-  // --- UTILS ---
-  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
-  const lerp = (a,b,t) => a + (b-a)*t;
-  const rand = (a,b) => a + Math.random()*(b-a);
-  const randi = (a,b) => a + Math.floor(Math.random()*(b-a+1));
-  const chance = (p) => Math.random() < p;
-  const dist = (ax,ay,bx,by) => Math.hypot(ax-bx, ay-by);
-  const aabb = (ax,ay,aw,ah,bx,by,bw,bh) => ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+// --- MATH UTILITIES ---
+const MathUtils = {
+    lerp: (a, b, t) => a + (b - a) * t,
+    dist: (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2),
+    clamp: (num, min, max) => Math.min(Math.max(num, min), max),
+    rand: (min, max) => Math.random() * (max - min) + min,
+    randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+};
 
-  // --- LEADERBOARD ---
-  const Leaderboard = {
-    key: "ASYLUM_DC_SCORES",
-    data: JSON.parse(localStorage.getItem("ASYLUM_DC_SCORES")||"[]"),
-    add(name, score, mission, res){
-      this.data.push({name, score, mission, res});
-      this.data.sort((a,b)=>b.score-a.score);
-      this.data = this.data.slice(0,10);
-      localStorage.setItem(this.key, JSON.stringify(this.data));
-    },
-    html(){
-      if(!this.data.length) return "No records found.";
-      return `<table><tr><th>NAME</th><th>SCORE</th><th>RESULT</th></tr>` + 
-        this.data.map(d=>`<tr><td>${d.name}</td><td style="color:#7d3cff">${d.score}</td><td>${d.res}</td></tr>`).join("") + `</table>`;
+// --- AUDIO SYSTEM (PROCEDURAL) ---
+// Generates horror ambience and SFX without external files to ensure zero-dependency running.
+class AudioSynth {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.connect(this.ctx.destination);
+        this.masterGain.gain.value = 0.4;
+        this.initialized = false;
     }
-  };
 
-  // --- CANVAS & AUDIO ---
-  const canvas = document.createElement("canvas");
-  document.body.appendChild(canvas);
-  const ctx = canvas.getContext("2d", {alpha:false});
-  const buf = document.createElement("canvas"); // Low-res buffer
-  const RW=480, RH=270;
-  buf.width=RW; buf.height=RH;
-  const bctx = buf.getContext("2d", {alpha:false});
+    resume() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        this.initialized = true;
+        this.startAmbience();
+    }
 
-  let W, H, SCALE, DX, DY;
-  const resize = () => {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-    SCALE = Math.max(1, Math.floor(Math.min(W/RW, H/RH)));
-    DX = (W - RW*SCALE)/2; DY = (H - RH*SCALE)/2;
-    ctx.imageSmoothingEnabled = false;
-  };
-  window.onresize = resize; resize();
-
-  const AudioSys = {
-    ctx: null, master: null,
-    init(){
-      if(this.ctx) return;
-      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
-      this.master = this.ctx.createGain();
-      this.master.connect(this.ctx.destination);
-      this.master.gain.value = 0.3;
-      // Start Procedural Industrial Drone
-      const osc = this.ctx.createOscillator(); osc.type="sawtooth"; osc.frequency.value=55;
-      const lpf = this.ctx.createBiquadFilter(); lpf.type="lowpass"; lpf.frequency.value=120;
-      const lfo = this.ctx.createOscillator(); lfo.frequency.value=0.2; 
-      const lfoG = this.ctx.createGain(); lfoG.gain.value=50;
-      lfo.connect(lfoG).connect(lpf.frequency);
-      osc.connect(lpf).connect(this.master);
-      osc.start(); lfo.start();
-    },
-    play(kind){
-      if(!this.ctx) return;
-      const t = this.ctx.currentTime;
-      const o = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      o.connect(g).connect(this.master);
-      
-      if(kind==="shoot"){
-        o.type="square"; o.frequency.setValueAtTime(400,t); o.frequency.exponentialRampToValueAtTime(100,t+0.1);
-        g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
-        o.start(t); o.stop(t+0.1);
-      } else if(kind==="hit"){
-        o.type="sawtooth"; o.frequency.setValueAtTime(100,t); o.frequency.linearRampToValueAtTime(0,t+0.1);
-        g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
-        o.start(t); o.stop(t+0.15);
-      } else if(kind==="glass"){
-        o.type="triangle"; o.frequency.setValueAtTime(2000,t); o.frequency.exponentialRampToValueAtTime(500,t+0.1);
-        g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
-        o.start(t); o.stop(t+0.1);
-      } else if(kind==="glitch"){
-        o.type="sawtooth"; o.frequency.setValueAtTime(rand(200,800),t);
-        g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
-        o.start(t); o.stop(t+0.05);
-      }
-    }
-  };
-
-  // --- VISUAL FX ---
-  class VisualFX {
-    constructor(){
-      this.particles = [];
-      this.decals = [];
-      this.glitchT = 0;
-      this.rgbShift = 0;
-    }
-    triggerGlitch(amt){ this.glitchT=amt; this.rgbShift=amt*10; AudioSys.play("glitch"); }
-    spawnParticle(x,y,kind,color){
-      const p = {x,y,kind, vx:rand(-120,120), vy:rand(-200,-50), life:rand(0.5,1.5), color:color||"#fff", sz:rand(1,3)};
-      if(kind==="blood"){ p.vy = rand(-150,50); p.sz=2; } // Blood physics
-      if(kind==="debris"){ p.sz=rand(2,4); }
-      this.particles.push(p);
-    }
-    spawnDecal(x,y,kind){
-      if(this.decals.length>60) this.decals.shift();
-      this.decals.push({x,y,kind, w:rand(4,10), h:rand(2,4)});
-    }
-    update(dt, groundY){
-      this.glitchT = Math.max(0, this.glitchT-dt);
-      this.rgbShift = Math.max(0, this.rgbShift-dt*5);
-      
-      for(let i=this.particles.length-1; i>=0; i--){
-        let p = this.particles[i];
-        p.life -= dt;
-        p.x += p.vx*dt;
-        p.y += p.vy*dt;
-        p.vy += 800*dt; // Gravity
+    startAmbience() {
+        // Industrial Drone
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
         
-        // Physics collision for blood/debris
-        if((p.kind==="blood" || p.kind==="debris") && p.y >= groundY){
-          p.y = groundY;
-          p.vx *= 0.5; // Friction
-          p.vy *= -0.3; // Bounce
-          if(Math.abs(p.vy) < 20) p.vy = 0;
-          
-          if(p.kind==="blood" && Math.abs(p.vx)<5 && Math.abs(p.vy)<5){
-            this.spawnDecal(p.x, groundY, "blood");
-            p.life = 0; // Convert to decal
-          }
-        }
-        if(p.life<=0) this.particles.splice(i,1);
-      }
-    }
-    draw(ctx, camx){
-      for(let d of this.decals){
-        ctx.fillStyle = d.kind==="blood"?"#7a0a0a":"#333";
-        ctx.fillRect(d.x-camx-d.w/2, d.y-d.h/2, d.w, d.h);
-      }
-      for(let p of this.particles){
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x-camx, p.y, p.sz, p.sz);
-      }
-    }
-    postProcess(ctx){
-      if(this.rgbShift > 0.5){
-        const s = this.rgbShift|0;
-        ctx.globalCompositeOperation = "screen";
-        ctx.drawImage(ctx.canvas, -s, 0); // Cyan shift
-        ctx.drawImage(ctx.canvas, s, 0);  // Red shift
-        ctx.globalCompositeOperation = "source-over";
-      }
-      if(this.glitchT > 0.1){
-        for(let i=0; i<5; i++){
-          const y = randi(0,RH); const h=randi(2,15); const o=randi(-10,10);
-          ctx.drawImage(ctx.canvas, 0,y,RW,h, o,y,RW,h);
-        }
-      }
-    }
-  }
-
-  // --- ENTITIES ---
-  class Entity {
-    constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; this.vx=0; this.vy=0; this.hp=1; this.dead=false; }
-    get cx(){ return this.x+this.w/2; }
-    get cy(){ return this.y+this.h/2; }
-  }
-
-  class Prop extends Entity {
-    constructor(x,y,kind){
-      super(x,y,0,0);
-      this.kind=kind; this.broken=false;
-      if(kind==="bed"){ this.w=32; this.h=16; this.hp=15; }
-      else if(kind==="iv"){ this.w=10; this.h=32; this.hp=5; }
-      else if(kind==="monitor"){ this.w=16; this.h=16; this.hp=10; }
-      else if(kind==="cabinet"){ this.w=24; this.h=32; this.hp=12; }
-      this.y = y - this.h;
-    }
-    hit(dmg, game){
-      if(this.broken) return;
-      this.hp -= dmg;
-      game.fx.spawnParticle(this.cx, this.cy, "spark");
-      if(this.hp<=0){
-        this.broken=true;
-        game.score += 50;
-        AudioSys.play("glass");
-        game.fx.triggerGlitch(0.1);
-        for(let i=0;i<8;i++) game.fx.spawnParticle(this.cx, this.cy, "debris", i%2==0?"#555":"#888");
-      }
-    }
-    draw(ctx, camx){
-      const x = (this.x - camx)|0; const y = this.y|0;
-      if(this.broken){ ctx.fillStyle="#222"; ctx.fillRect(x, y+this.h-4, this.w, 4); return; }
-      
-      if(this.kind==="bed"){
-        ctx.fillStyle="#ccc"; ctx.fillRect(x,y+6,this.w,4); // Mattress
-        ctx.fillStyle="#334"; ctx.fillRect(x,y+10,this.w,6); // Frame
-        ctx.fillStyle="#445"; ctx.fillRect(x,y,4,16); // Headboard
-      } else if(this.kind==="iv"){
-        ctx.fillStyle="#888"; ctx.fillRect(x+4,y,2,32);
-        ctx.fillStyle="#aaf"; ctx.fillRect(x+2,y+2,6,10);
-      } else if(this.kind==="monitor"){
-        ctx.fillStyle="#111"; ctx.fillRect(x,y,16,14);
-        ctx.fillStyle="#0f0"; ctx.fillRect(x+2,y+6,12,1); // Line
-        ctx.fillStyle="#444"; ctx.fillRect(x+6,y+14,4,2);
-      } else if(this.kind==="cabinet"){
-        ctx.fillStyle="#5d4037"; ctx.fillRect(x,y,24,32);
-        ctx.fillStyle="#3e2723"; ctx.fillRect(x+2,y+2,20,28);
-      }
-    }
-  }
-
-  class Enemy extends Entity {
-    constructor(x,y,type){
-      super(x,y,18,28);
-      this.type=type; 
-      this.hp = type==="boss"?500:(type==="anesthesiologist"?25:20);
-      this.maxHp = this.hp;
-      this.timer=0;
-    }
-    update(dt, game){
-      this.timer+=dt;
-      const dist = game.player.x - this.x;
-      
-      // Madness: Enemies harmless
-      if(game.madness) {
-        this.vx = Math.sin(game.time*2 + this.x)*20;
-        return;
-      }
-
-      if(this.type==="anesthesiologist"){
-        if(Math.abs(dist) < 180 && Math.abs(dist) > 60){
-          this.vx = 0;
-          if(this.timer > 2.5){
-            this.timer=0;
-            const ang = Math.atan2((game.player.y+10)-this.y, game.player.x-this.x);
-            game.projectiles.push({x:this.x, y:this.y+10, vx:Math.cos(ang)*250, vy:Math.sin(ang)*250, kind:"syringe", life:2});
-          }
-        } else {
-          this.vx = sign(dist)*40;
-        }
-      } else {
-        this.vx = sign(dist)*60;
-      }
-      this.x += this.vx*dt;
-      this.y += 800*dt*dt; // Fake gravity
-    }
-    draw(ctx, camx){
-      const x=(this.x-camx)|0; const y=this.y|0;
-      if(this.type==="anesthesiologist"){
-        ctx.fillStyle="#aaf"; ctx.fillRect(x,y,18,28); // Scrubs
-        ctx.fillStyle="#fff"; ctx.fillRect(x+4,y+4,10,6); // Mask
-      } else if(this.type==="boss"){
-        ctx.fillStyle="#800"; ctx.fillRect(x,y-30,40,60); // Big Box
-      } else {
-        ctx.fillStyle="#400"; ctx.fillRect(x,y,18,28); // Rusher
-      }
-    }
-  }
-
-  // --- GAME CLASS ---
-  class Game {
-    constructor(){
-      this.state="menu";
-      this.player={x:0,y:0,w:16,h:28,vx:0,vy:0,hp:100,san:100,sleepT:0};
-      this.groundY=220;
-      this.camx=0;
-      this.score=0;
-      this.time=0;
-      this.fx=new VisualFX();
-      this.props=[]; this.enemies=[]; this.projectiles=[]; this.graffiti=[]; this.secrets=[];
-      this.madness=false;
-      this.daughter={saved:false, x:-999};
-      
-      this.input={keys:{}, m:{x:0,y:0,down:false}};
-      this.cheatBuf="";
-      
-      window.onkeydown=e=>{
-        this.input.keys[e.code]=true;
-        if(this.state==="play"){
-          if(e.code==="KeyE") this.interact();
-          this.cheatBuf += e.key.toUpperCase();
-          if(this.cheatBuf.length>10) this.cheatBuf=this.cheatBuf.slice(-10);
-          if(this.cheatBuf.endsWith("IDDQD")){ this.player.hp=999; this.toast("GOD MODE"); }
-          if(this.cheatBuf.endsWith("MOTHER")){ this.player.san=999; this.toast("SANITY FULL"); }
-        }
-      };
-      window.onkeyup=e=>this.input.keys[e.code]=false;
-      window.onmousemove=e=>{
-        const r=canvas.getBoundingClientRect();
-        this.input.m.x=(e.clientX-r.left-DX)/SCALE;
-        this.input.m.y=(e.clientY-r.top-DY)/SCALE;
-      };
-      window.onmousedown=()=>this.input.m.down=true;
-      window.onmouseup=()=>this.input.m.down=false;
-    }
-
-    toast(msg){ document.querySelector(".toast").textContent=msg; document.querySelector(".toast").classList.add("show"); setTimeout(()=>document.querySelector(".toast").classList.remove("show"),2000); }
-
-    start(mission){
-      this.state="play"; this.mission=mission; this.score=0; this.time=0;
-      this.player.x=100; this.player.y=100; this.player.hp=100; this.player.san=100; this.player.sleepT=0;
-      this.props=[]; this.enemies=[]; this.projectiles=[]; this.graffiti=[]; this.secrets=[];
-      this.madness=false;
-      
-      // Gen Level
-      for(let x=300; x<5000; x+=rand(60,150)){
-        if(chance(0.25)) this.props.push(new Prop(x, this.groundY, ["bed","cabinet","iv","monitor"][randi(0,3)]));
-        if(chance(0.15)) this.enemies.push(new Enemy(x, this.groundY-28, chance(0.4)?"anesthesiologist":"rusher"));
-        if(chance(0.08)) this.graffiti.push({x, y:rand(60,150), txt:["RUN","LIES","IT HURTS","NO EXIT"][randi(0,3)]});
-        if(chance(0.03)) this.secrets.push({x, y:this.groundY-30, w:24, h:32});
-      }
-      
-      if(mission==="SAVE_CHILD") this.daughter = {x:4800, y:this.groundY-26, saved:false, w:16, h:26};
-    }
-
-    update(dt){
-      if(this.state!=="play") return;
-      this.time += dt;
-      const p = this.player;
-
-      // Sleep Status
-      if(p.sleepT > 0){
-        p.sleepT -= dt;
-        return; 
-      }
-
-      // Madness Trigger (Low Sanity)
-      if(p.san < 30 && !this.madness && chance(0.01)){
-        this.madness=true;
-        this.fx.triggerGlitch(2.0);
-        this.toast("MADNESS STARTED");
-        AudioSys.play("glitch");
-      }
-      if(this.madness && p.san > 50) this.madness=false;
-
-      // Player Controls
-      if(this.input.keys["KeyA"] || this.input.keys["ArrowLeft"]) p.vx = -120;
-      else if(this.input.keys["KeyD"] || this.input.keys["ArrowRight"]) p.vx = 120;
-      else p.vx = 0;
-
-      if((this.input.keys["Space"]||this.input.keys["ArrowUp"]) && p.grounded){
-        p.vy = -350; p.grounded=false;
-      }
-
-      p.vy += 800*dt;
-      p.x += p.vx*dt; p.y += p.vy*dt;
-
-      // Ground Collision
-      if(p.y+p.h >= this.groundY){ p.y=this.groundY-p.h; p.vy=0; p.grounded=true; }
-      else p.grounded=false;
-
-      // Camera
-      this.camx = lerp(this.camx, p.x - RW/3, 0.1);
-
-      // Shooting
-      if(this.input.m.down){
-        this.input.m.down=false; // Semi-auto
-        const ang = Math.atan2(this.input.m.y - (p.y+10), (this.input.m.x+this.camx) - p.x);
-        this.projectiles.push({x:p.x+8, y:p.y+10, vx:Math.cos(ang)*600, vy:Math.sin(ang)*600, kind:"bullet", life:1});
-        AudioSys.play("shoot");
-      }
-
-      // Entities
-      this.enemies.forEach(e => {
-        e.update(dt, this);
-        if(e.y+e.h >= this.groundY) e.y=this.groundY-e.h;
+        osc.type = 'sawtooth';
+        osc.frequency.value = 50;
         
-        // Touch Damage (Disabled in Madness)
-        if(!e.dead && !this.madness && aabb(p.x,p.y,p.w,p.h, e.x,e.y,e.w,e.h)){
-          this.hitPlayer(10);
+        filter.type = 'lowpass';
+        filter.frequency.value = 120;
+        
+        // LFO for throbbing effect
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.2;
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 100;
+        
+        lfo.connect(lfoGain).connect(filter.frequency);
+        
+        osc.connect(filter).connect(gain).connect(this.masterGain);
+        gain.gain.value = 0.15;
+        
+        osc.start();
+        lfo.start();
+    }
+
+    playShoot() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        
+        osc.connect(gain).connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+
+    playImpact() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(20, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+        osc.connect(gain).connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+    }
+
+    playScream() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(200, this.ctx.currentTime + 0.4);
+        // Jitter the frequency for horror
+        for(let i=0; i<10; i++) {
+            osc.frequency.setValueAtTime(200 + Math.random()*500, this.ctx.currentTime + (i*0.05));
         }
-      });
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+        osc.connect(gain).connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.6);
+    }
+}
 
-      // Projectiles
-      for(let i=this.projectiles.length-1; i>=0; i--){
-        let pr = this.projectiles[i];
-        pr.life -= dt;
-        pr.x += pr.vx*dt; pr.y += pr.vy*dt;
+// --- INPUT HANDLER ---
+class InputHandler {
+    constructor() {
+        this.keys = {};
+        this.mouse = { x: 0, y: 0, down: false };
+        
+        window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousemove', e => {
+            const rect = Game.canvas.getBoundingClientRect();
+            // Scale mouse pos to internal resolution
+            this.mouse.x = (e.clientX - rect.left) * (Game.width / rect.width);
+            this.mouse.y = (e.clientY - rect.top) * (Game.height / rect.height);
+        });
+        window.addEventListener('mousedown', () => this.mouse.down = true);
+        window.addEventListener('mouseup', () => this.mouse.down = false);
+    }
+}
 
-        // Player Hit (Syringe)
-        if(pr.kind==="syringe" && aabb(pr.x,pr.y,4,4, p.x,p.y,p.w,p.h)){
-          p.sleepT = 2.0;
-          this.hitPlayer(5);
-          this.toast("SEDATED...");
-          pr.life=0;
-        }
+// --- RENDERING SYSTEM (LIGHTING & GFX) ---
+class Renderer {
+    constructor(ctx, width, height) {
+        this.ctx = ctx;
+        this.width = width;
+        this.height = height;
+        // Offscreen canvas for lighting layer
+        this.lightCanvas = document.createElement('canvas');
+        this.lightCanvas.width = width;
+        this.lightCanvas.height = height;
+        this.lightCtx = this.lightCanvas.getContext('2d');
+    }
 
-        // Enemy/Prop Hit (Bullet)
-        if(pr.kind==="bullet"){
-          for(let prop of this.props) if(!prop.broken && aabb(pr.x,pr.y,4,4, prop.x,prop.y,prop.w,prop.h)){
-            prop.hit(5, this); pr.life=0;
-          }
-          for(let e of this.enemies) if(!e.dead && !this.madness && aabb(pr.x,pr.y,4,4, e.x,e.y,e.w,e.h)){
-            e.hp -= 5;
-            this.fx.spawnParticle(e.x+e.w/2, e.y+e.h/2, "blood");
-            if(e.hp<=0){
-              e.dead=true;
-              this.score+=100;
-              for(let k=0;k<10;k++) this.fx.spawnParticle(e.x,e.y,"blood"); // Gore
+    clear() {
+        this.ctx.fillStyle = '#050505'; // Dark background
+        this.ctx.fillRect(0, 0, this.width, this.height);
+    }
+
+    drawMap(walls) {
+        this.ctx.fillStyle = '#1a1a1a'; // Wall color
+        this.ctx.strokeStyle = '#2d2d2d';
+        walls.forEach(w => {
+            this.ctx.fillRect(w.x, w.y, w.w, w.h);
+            this.ctx.strokeRect(w.x, w.y, w.w, w.h);
+            // Grime details
+            if (w.x % 50 === 0) {
+                this.ctx.fillStyle = '#0f0f0f';
+                this.ctx.fillRect(w.x + 2, w.y, 2, w.h);
+                this.ctx.fillStyle = '#1a1a1a';
             }
-            pr.life=0;
-          }
+        });
+        
+        // Draw floor grid (subtle)
+        this.ctx.strokeStyle = '#0a0a0a';
+        this.ctx.beginPath();
+        for(let i=0; i<this.width; i+=40) {
+            this.ctx.moveTo(i, 0); this.ctx.lineTo(i, this.height);
         }
-        if(pr.life<=0) this.projectiles.splice(i,1);
-      }
-
-      // Cleanup
-      this.enemies = this.enemies.filter(e=>!e.dead);
-
-      // Win/Lose
-      if(p.hp<=0 || p.san<=0) this.end("LOSE");
-      if(this.mission==="REACH_EXIT" && p.x > 5000) this.end("WIN");
-      if(this.mission==="SURVIVE_120" && this.time > 120) this.end("WIN");
-    }
-
-    interact(){
-      const p = this.player;
-      // Daughter
-      if(this.daughter.x > 0 && !this.daughter.saved && dist(p.x,p.y, this.daughter.x, this.daughter.y)<40){
-        this.daughter.saved=true;
-        this.score+=1000;
-        this.toast("DAUGHTER SAVED");
-        if(this.mission==="SAVE_CHILD") this.end("WIN");
-      }
-      // Secrets
-      for(let s of this.secrets){
-        if(aabb(p.x,p.y,p.w,p.h, s.x,s.y,s.w,s.h)){
-          this.toast("SECRET ROOM FOUND");
-          this.score+=500;
-          p.x += 10000; // Warp
-          this.camx = p.x-100;
-          this.props.push(new Prop(p.x+50, this.groundY, "cabinet")); // Loot
-          return;
+        for(let i=0; i<this.height; i+=40) {
+            this.ctx.moveTo(0, i); this.ctx.lineTo(this.width, i);
         }
-      }
+        this.ctx.stroke();
     }
 
-    hitPlayer(dmg){
-      this.player.hp -= dmg;
-      this.player.san -= dmg*0.5;
-      this.fx.triggerGlitch(0.2);
-      this.fx.spawnParticle(this.player.x, this.player.y, "blood");
-      AudioSys.play("hit");
+    drawBlood(decals) {
+        decals.forEach(d => {
+            this.ctx.fillStyle = `rgba(100, 0, 0, ${d.alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
     }
 
-    end(res){
-      this.state="end";
-      document.getElementById("end").style.display="grid";
-      document.getElementById("endTitle").textContent = res==="WIN"?"MISSION COMPLETE":"TERMINATED";
-      document.getElementById("endBody").textContent = `FINAL SCORE: ${this.score}\n\n` + (res==="WIN"?"The files are secured.":"Subject Expired.");
-      
-      const autopsy = [];
-      if(this.player.hp<20) autopsy.push("Massive trauma detected.");
-      if(this.player.san<20) autopsy.push("Complete psychological collapse.");
-      if(this.madness) autopsy.push("Subject experienced severe hallucinations.");
-      document.getElementById("endAutopsy").textContent = "AUTOPSY: " + autopsy.join(" ");
-      
-      Leaderboard.add(document.getElementById("inName").value, this.score, this.mission, res);
+    drawEntities(entities, player) {
+        entities.forEach(e => e.draw(this.ctx));
+        player.draw(this.ctx);
     }
 
-    draw(){
-      // Clear
-      bctx.fillStyle="#000"; bctx.fillRect(0,0,RW,RH);
-      
-      if(this.player.sleepT > 0){
-        // Sleep Fade
-        bctx.fillStyle = `rgba(0,0,0,${Math.min(1, this.player.sleepT)})`;
-        bctx.fillRect(0,0,RW,RH);
-      }
+    // Professional Ray-casted/Gradient Lighting
+    drawLighting(player, entities) {
+        // Fill darkness
+        this.lightCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+        this.lightCtx.fillRect(0, 0, this.width, this.height);
 
-      // Parallax Graffiti
-      bctx.save();
-      bctx.fillStyle="rgba(255,255,255,0.15)";
-      bctx.font="10px monospace";
-      for(let g of this.graffiti){
-        if(g.x-this.camx > -50 && g.x-this.camx < RW+50)
-          bctx.fillText(g.txt, (g.x-this.camx*0.8)|0, g.y);
-      }
-      bctx.restore();
+        // Flashlight beam
+        if (player.flashlightOn) {
+            this.lightCtx.globalCompositeOperation = 'destination-out';
+            const grad = this.lightCtx.createRadialGradient(
+                player.x, player.y, 10,
+                player.x + Math.cos(player.angle)*150, 
+                player.y + Math.sin(player.angle)*150, 
+                120
+            );
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            this.lightCtx.fillStyle = grad;
+            this.lightCtx.beginPath();
+            this.lightCtx.moveTo(player.x, player.y);
+            this.lightCtx.arc(player.x, player.y, 250, player.angle - 0.4, player.angle + 0.4);
+            this.lightCtx.fill();
+        }
 
-      // Secrets
-      bctx.fillStyle="#151515";
-      for(let s of this.secrets) bctx.fillRect((s.x-this.camx)|0, s.y, s.w, s.h);
+        // Small glow around player
+        this.lightCtx.globalCompositeOperation = 'destination-out';
+        const pGlow = this.lightCtx.createRadialGradient(player.x, player.y, 5, player.x, player.y, 40);
+        pGlow.addColorStop(0, 'rgba(255,255,255,0.8)');
+        pGlow.addColorStop(1, 'rgba(255,255,255,0)');
+        this.lightCtx.fillStyle = pGlow;
+        this.lightCtx.beginPath();
+        this.lightCtx.arc(player.x, player.y, 40, 0, Math.PI*2);
+        this.lightCtx.fill();
 
-      // Floor
-      bctx.fillStyle="#222"; bctx.fillRect(0, this.groundY, RW, RH-this.groundY);
+        // Enemy Eyes (Glowing Red in Dark)
+        this.lightCtx.globalCompositeOperation = 'source-over';
+        entities.forEach(e => {
+            if(e.type === 'enemy') {
+                this.lightCtx.fillStyle = 'red';
+                this.lightCtx.fillRect(e.x - 2, e.y - 5, 2, 2);
+                this.lightCtx.fillRect(e.x + 2, e.y - 5, 2, 2);
+            }
+        });
 
-      this.fx.draw(bctx, this.camx);
-      for(let p of this.props) p.draw(bctx, this.camx);
-      for(let e of this.enemies) e.draw(bctx, this.camx);
-      
-      // Daughter
-      if(this.daughter.x > 0){
-        const dx = (this.daughter.saved ? this.player.x-10 : this.daughter.x) - this.camx;
-        const dy = (this.daughter.saved ? this.player.y : this.daughter.y);
-        bctx.fillStyle="#0fa"; bctx.fillRect(dx|0, dy|0, 14, 24); // Green dress
-      }
-
-      // Player
-      bctx.fillStyle=this.player.sleepT>0?"#448":"#fff";
-      bctx.fillRect((this.player.x-this.camx)|0, this.player.y|0, 16, 28);
-      
-      // Projectiles
-      for(let p of this.projectiles){
-        bctx.fillStyle = p.kind==="bullet"?"#ff0":"#0f0";
-        bctx.fillRect((p.x-this.camx)|0, p.y|0, 4, 2);
-      }
-
-      // Post
-      this.fx.postProcess(bctx);
-
-      // Blit
-      ctx.drawImage(buf, 0,0,RW,RH, DX,DY, RW*SCALE, RH*SCALE);
-
-      // UI Updates
-      document.getElementById("uiHp").style.width = clamp(this.player.hp,0,100)+"%";
-      document.getElementById("uiSan").style.width = clamp(this.player.san,0,100)+"%";
-      document.getElementById("uiScore").textContent = this.score.toString().padStart(6,"0");
-      document.getElementById("uiMadness").style.display = this.madness?"block":"none";
+        // Apply lighting to main canvas
+        this.ctx.drawImage(this.lightCanvas, 0, 0);
+        this.lightCtx.globalCompositeOperation = 'source-over'; // Reset
     }
-  }
+}
 
-  // --- INIT ---
-  const game = new Game();
-  let lastT = 0;
-  function loop(t){
-    const dt = Math.min(0.1, (t-lastT)/1000);
-    lastT = t;
-    game.update(dt);
-    game.draw();
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
+// --- GAME ENTITIES ---
 
-  document.getElementById("btnStart").onclick = () => {
-    AudioSys.init();
-    document.getElementById("menu").style.display="none";
-    game.start(document.getElementById("inMission").value);
-  };
-  document.getElementById("btnScores").onclick = () => {
-    document.getElementById("scores").style.display="grid";
-    document.getElementById("scoreList").innerHTML = Leaderboard.html();
-  };
+class Player {
+    constructor(x, y) {
+        this.x = x; this.y = y;
+        this.w = 16; this.h = 16;
+        this.hp = 100;
+        this.coherence = 100; // "Sanity"
+        this.ammo = 12;
+        this.magSize = 12;
+        this.speed = 2;
+        this.angle = 0;
+        this.flashlightOn = true;
+        this.reloading = false;
+        this.muzzleFlash = 0;
+    }
 
-})();
+    update(input, walls, dt) {
+        // Movement with Wall Collision
+        let dx = 0, dy = 0;
+        if (input.keys['w']) dy -= this.speed;
+        if (input.keys['s']) dy += this.speed;
+        if (input.keys['a']) dx -= this.speed;
+        if (input.keys['d']) dx += this.speed;
+
+        // "Coherence" Input Lag simulation
+        if (this.coherence < 30 && Math.random() > 0.9) {
+            dx *= -1; // Controls invert momentarily
+        }
+
+        if (dx !== 0 || dy !== 0) {
+            if (!this.checkCollision(this.x + dx, this.y, walls)) this.x += dx;
+            if (!this.checkCollision(this.x, this.y + dy, walls)) this.y += dy;
+            
+            // Step sound simulation handled in game loop
+        }
+
+        // Aiming
+        this.angle = Math.atan2(input.mouse.y - this.y, input.mouse.x - this.x);
+
+        // Flashlight Toggle
+        if (input.keys['f'] && !this.fPressed) {
+            this.flashlightOn = !this.flashlightOn;
+            this.fPressed = true;
+        } else if (!input.keys['f']) {
+            this.fPressed = false;
+        }
+
+        if (this.muzzleFlash > 0) this.muzzleFlash--;
+    }
+
+    checkCollision(x, y, walls) {
+        for (let w of walls) {
+            if (x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h) return true;
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // Body (Tactical Vest look)
+        ctx.fillStyle = '#2a3b4c';
+        ctx.fillRect(-8, -8, 16, 16);
+        
+        // Arms/Gun
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 4, 12, 4); // Right arm
+        ctx.fillStyle = '#555';
+        ctx.fillRect(8, 2, 14, 3); // Gun barrel
+
+        // Muzzle Flash
+        if (this.muzzleFlash > 0) {
+            ctx.fillStyle = '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(22, 3, 5 + Math.random()*5, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor(x, y) {
+        this.x = x; this.y = y;
+        this.w = 16; this.h = 16;
+        this.hp = 3;
+        this.speed = 1.2;
+        this.type = 'enemy';
+        this.state = 'IDLE'; // IDLE, CHASE, ATTACK
+        this.detectRange = 150;
+        this.angle = 0;
+    }
+
+    update(player, walls, dt) {
+        const d = MathUtils.dist(this.x, this.y, player.x, player.y);
+        
+        // AI Logic
+        if (d < this.detectRange || this.hp < 3) {
+            this.state = 'CHASE';
+        }
+
+        if (this.state === 'CHASE') {
+            this.angle = Math.atan2(player.y - this.y, player.x - this.x);
+            // Simple pathfinding (move towards player)
+            let dx = Math.cos(this.angle) * this.speed;
+            let dy = Math.sin(this.angle) * this.speed;
+            
+            // Jitter movement (creepier)
+            if (Math.random() > 0.9) this.angle += MathUtils.rand(-0.5, 0.5);
+
+            this.x += dx;
+            this.y += dy;
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // Monster Graphic (Fleshy blob style)
+        ctx.fillStyle = '#8a3324';
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI*2);
+        ctx.fill();
+        
+        // Tentacles/Limbs
+        ctx.strokeStyle = '#5a2015';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 5); ctx.lineTo(10, 10);
+        ctx.moveTo(0, -5); ctx.lineTo(10, -10);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+class Projectile {
+    constructor(x, y, angle) {
+        this.x = x; this.y = y;
+        this.vx = Math.cos(angle) * 10;
+        this.vy = Math.sin(angle) * 10;
+        this.active = true;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#ffffaa';
+        ctx.fillRect(this.x, this.y, 2, 2);
+    }
+}
+
+// --- MAIN GAME CONTROLLER ---
+const Game = {
+    canvas: document.getElementById('gameCanvas'),
+    ctx: null,
+    width: 640,  // Internal Resolution
+    height: 360, // Internal Resolution
+    
+    player: null,
+    walls: [],
+    enemies: [],
+    projectiles: [],
+    bloodDecals: [],
+    
+    renderer: null,
+    input: null,
+    audio: null,
+    
+    state: 'MENU', // MENU, PLAY, GAMEOVER
+    lastTime: 0,
+    
+    // Logs for narrative
+    logs: [
+        "> SYSTEM: LINK ESTABLISHED...",
+        "> USER: CLEANER_UNIT_4",
+        "> MISSION: PURGE BIOLOGICAL DATA",
+        "> WARNING: REALITY COHERENCE UNSTABLE"
+    ],
+
+    init() {
+        this.ctx = this.canvas.getContext('2d');
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        
+        this.renderer = new Renderer(this.ctx, this.width, this.height);
+        this.input = new InputHandler();
+        this.audio = new AudioSynth();
+        
+        this.audio.resume();
+        document.getElementById('menu-screen').style.display = 'none';
+        
+        this.reset();
+        this.state = 'PLAY';
+        
+        requestAnimationFrame(t => this.loop(t));
+        this.log("ENTERING FACILITY...");
+    },
+
+    reset() {
+        this.player = new Player(100, 100);
+        this.walls = [
+            {x:0, y:0, w:640, h:20}, {x:0, y:340, w:640, h:20},
+            {x:0, y:0, w:20, h:360}, {x:620, y:0, w:20, h:360},
+            {x:200, y:100, w:20, h:150}, {x:400, y:50, w:150, h:20},
+            {x:400, y:200, w:150, h:20}
+        ];
+        this.enemies = [];
+        // Spawn initial enemy
+        this.enemies.push(new Enemy(500, 300));
+        this.enemies.push(new Enemy(550, 100));
+        this.projectiles = [];
+        this.bloodDecals = [];
+    },
+
+    log(msg) {
+        this.logs.push(`> ${msg}`);
+        if(this.logs.length > 6) this.logs.shift();
+        const logDiv = document.getElementById('log-area');
+        logDiv.innerHTML = this.logs.join('<br>');
+    },
+
+    update(dt) {
+        if(this.state !== 'PLAY') return;
+
+        // Player Logic
+        this.player.update(this.input, this.walls, dt);
+
+        // Shooting
+        if(this.input.mouse.down && this.player.ammo > 0 && !this.player.cooldown) {
+            this.projectiles.push(new Projectile(this.player.x, this.player.y, this.player.angle));
+            this.player.ammo--;
+            this.player.muzzleFlash = 3;
+            this.player.cooldown = 10; // Fire rate
+            this.audio.playShoot();
+            // Recoil
+            this.player.x -= Math.cos(this.player.angle)*2;
+            this.player.y -= Math.sin(this.player.angle)*2;
+        }
+        if(this.player.cooldown > 0) this.player.cooldown--;
+
+        // Projectiles
+        this.projectiles.forEach(p => p.update());
+        // Remove OOB
+        this.projectiles = this.projectiles.filter(p => 
+            p.x > 0 && p.x < this.width && p.y > 0 && p.y < this.height && p.active
+        );
+
+        // Enemies
+        this.enemies.forEach(e => {
+            e.update(this.player, this.walls, dt);
+            
+            // Collision with Player
+            if(MathUtils.dist(e.x, e.y, this.player.x, this.player.y) < 16) {
+                this.player.hp -= 1;
+                this.player.coherence -= 0.5;
+                if(Math.random()>0.9) this.audio.playImpact();
+            }
+
+            // Hit by bullets
+            this.projectiles.forEach(p => {
+                if(p.active && MathUtils.dist(p.x, p.y, e.x, e.y) < 12) {
+                    e.hp--;
+                    p.active = false;
+                    // Blood Splat
+                    this.bloodDecals.push({
+                        x: e.x + MathUtils.rand(-5,5),
+                        y: e.y + MathUtils.rand(-5,5),
+                        size: MathUtils.rand(2, 6),
+                        alpha: 1
+                    });
+                    this.audio.playImpact();
+                }
+            });
+        });
+
+        // Kill dead enemies
+        const deadEnemies = this.enemies.filter(e => e.hp <= 0);
+        if (deadEnemies.length > 0) {
+            deadEnemies.forEach(e => {
+                this.log("SUBJECT TERMINATED.");
+                this.audio.playScream();
+                // Spawn new ones to keep tension
+                setTimeout(() => {
+                    this.enemies.push(new Enemy(MathUtils.rand(50, 600), MathUtils.rand(50, 300)));
+                }, 2000);
+            });
+        }
+        this.enemies = this.enemies.filter(e => e.hp > 0);
+
+        // Coherence Glitches
+        if (this.player.coherence < 50) {
+            document.getElementById('glitch-overlay').style.display = (Math.random() > 0.95) ? 'block' : 'none';
+        } else {
+            document.getElementById('glitch-overlay').style.display = 'none';
+        }
+
+        // Win/Loss
+        if (this.player.hp <= 0) {
+            this.log("CRITICAL FAILURE. SIGNAL LOST.");
+            this.state = 'GAMEOVER';
+        }
+    },
+
+    draw() {
+        this.renderer.clear();
+        this.renderer.drawBlood(this.bloodDecals);
+        this.renderer.drawMap(this.walls);
+        this.renderer.drawEntities([...this.enemies, ...this.projectiles], this.player);
+        this.renderer.drawLighting(this.player, this.enemies);
+        
+        // Update HTML UI
+        document.getElementById('hp-bar').style.width = this.player.hp + '%';
+        document.getElementById('coherence-bar').style.width = this.player.coherence + '%';
+        document.getElementById('ammo-counter').innerText = `AMMO: ${this.player.ammo}/${this.player.magSize}`;
+        
+        if(this.player.hp < 30) {
+            document.getElementById('hp-bar').classList.add('critical');
+        }
+        
+        // Dynamic Threat Indicator
+        let threat = false;
+        this.enemies.forEach(e => {
+            if(MathUtils.dist(this.player.x, this.player.y, e.x, e.y) < 100) threat = true;
+        });
+        document.getElementById('threat-level').style.opacity = threat ? 1 : 0;
+    },
+
+    loop(timestamp) {
+        const dt = timestamp - this.lastTime;
+        this.lastTime = timestamp;
+
+        this.update(dt);
+        this.draw();
+
+        requestAnimationFrame(t => this.loop(t));
+    }
+};
+
 </script>
 </body>
 </html>
