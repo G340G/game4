@@ -1,414 +1,656 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORTEX RUPTURE</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #050505;
-            font-family: 'Courier New', Courier, monospace;
-            user-select: none;
-        }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            image-rendering: pixelated; /* Crucial for pixel art look */
-        }
-        #ui-layer {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #0f0;
-            font-size: 20px;
-            text-shadow: 2px 2px 0px #000;
-            pointer-events: none;
-            z-index: 10;
-        }
-        #sanity-meter {
-            width: 200px;
-            height: 20px;
-            border: 2px solid #0f0;
-            margin-top: 5px;
-            background: #000;
-        }
-        #sanity-fill {
-            width: 100%;
-            height: 100%;
-            background: #0f0;
-            transition: width 0.2s, background-color 0.5s;
-        }
-        #narrator-text {
-            position: absolute;
-            bottom: 10%;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 0px 0px 10px red;
-            pointer-events: none;
-            display: none;
-        }
-        .crt-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-            z-index: 99;
-        }
-        /* Start Screen */
-        #start-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #0f0;
-            z-index: 100;
-        }
-        button {
-            background: #000;
-            border: 2px solid #0f0;
-            color: #0f0;
-            padding: 15px 30px;
-            font-family: 'Courier New';
-            font-size: 20px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        button:hover { background: #0f0; color: #000; }
-    </style>
+<meta charset="UTF-8">
+<title>ASYLUM: DIRECTOR'S CUT</title>
+<style>
+  :root{
+    --bg:#050505; --panel:#0d0d12; --text:#a7a7b8; --accent:#7d3cff; --danger:#ff2a2a;
+    --shadow:0 0 20px rgba(0,0,0,0.8);
+  }
+  body{ margin:0; overflow:hidden; background:var(--bg); color:var(--text); font-family:monospace; user-select:none; }
+  canvas{ position:fixed; inset:0; width:100%; height:100%; image-rendering:pixelated; }
+  
+  /* UI Overlay */
+  .gOverlay{ position:fixed; inset:0; display:grid; place-items:center; z-index:50; background:rgba(0,0,0,0.85); backdrop-filter:blur(2px); }
+  .gPanel{ width:min(700px,90vw); background:linear-gradient(180deg,#12121a,#0a0a0f); border:1px solid #333; padding:20px; border-radius:4px; box-shadow:var(--shadow); position:relative; }
+  h1{ margin:0 0 10px 0; font-size:24px; color:#fff; text-shadow:0 0 10px var(--accent); letter-spacing:2px; text-transform:uppercase; }
+  .gBtn{ background:#1a1a22; border:1px solid #444; color:#ddd; padding:10px 20px; cursor:pointer; font:inherit; text-transform:uppercase; transition:0.1s; }
+  .gBtn:hover{ background:var(--accent); color:#000; border-color:var(--accent); }
+  .gRow{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:15px; }
+  input, select{ background:#000; border:1px solid #444; color:#fff; padding:8px; width:100%; font:inherit; box-sizing:border-box; }
+  
+  /* HUD */
+  .gHud{ position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; pointer-events:none; z-index:40; text-shadow:1px 1px 0 #000; }
+  .gBar{ width:160px; height:6px; background:#222; border:1px solid #444; margin-bottom:4px; position:relative; }
+  .gFill{ height:100%; transition:width 0.2s; }
+  .gStat{ font-size:10px; color:#aaa; margin-top:2px; }
+  
+  /* Boss Bar */
+  .bossBar{ position:fixed; bottom:20px; left:20%; right:20%; display:none; z-index:40; }
+  .bossName{ text-align:center; font-size:10px; color:#fff; margin-bottom:4px; text-shadow:0 0 4px #000; }
+  
+  /* CRT Scanlines */
+  .crt{ position:fixed; inset:0; pointer-events:none; z-index:90; background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.1) 50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03)); background-size:100% 2px, 3px 100%; }
+  
+  /* Toast */
+  .toast{ position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); border:1px solid #444; color:#fff; padding:8px 16px; font-size:12px; opacity:0; transition:0.3s; z-index:100; pointer-events:none; }
+  .toast.show{ opacity:1; bottom:40px; }
+
+  /* Leaderboard Table */
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+  th { text-align:left; color:#fff; border-bottom:1px solid #444; padding:4px; }
+  td { padding:4px; border-bottom:1px solid #222; color:#888; }
+</style>
 </head>
 <body>
 
-    <div class="crt-overlay"></div>
+<div class="crt"></div>
+<div class="toast"></div>
 
-    <div id="start-screen">
-        <h1 style="font-size: 60px; text-shadow: 4px 4px red;">CORTEX RUPTURE</h1>
-        <p>ARROWS to Move | Z to Shoot | SPACE to Jump</p>
-        <p>Warning: Contains flashing lights and audio glitches.</p>
-        <button onclick="startGame()">ENTER ASYLUM</button>
+<div class="gHud">
+  <div>
+    <div style="font-size:10px;color:#ff2a2a">HP</div><div class="gBar"><div id="uiHp" class="gFill" style="background:#ff2a2a;width:100%"></div></div>
+    <div style="font-size:10px;color:#7d3cff">SANITY</div><div class="gBar"><div id="uiSan" class="gFill" style="background:#7d3cff;width:100%"></div></div>
+    <div id="uiStatus" class="gStat"></div>
+  </div>
+  <div style="text-align:right">
+    <div id="uiScore" style="font-size:14px;color:#fff">000000</div>
+    <div id="uiMission" class="gStat"></div>
+    <div id="uiMadness" style="color:#ff2a2a;display:none;animation:pulse 0.5s infinite">MADNESS ACTIVE</div>
+  </div>
+</div>
+
+<div class="bossBar" id="bossWrap">
+  <div class="bossName" id="bossName">BOSS</div>
+  <div class="gBar" style="width:100%"><div id="bossFill" class="gFill" style="background:#fff;width:100%"></div></div>
+</div>
+
+<div id="menu" class="gOverlay">
+  <div class="gPanel">
+    <h1>ASYLUM: DIRECTOR'S CUT</h1>
+    <div style="font-size:11px;color:#666;margin-bottom:10px">
+      WASD/ARROWS: Move · SPACE: Jump · MOUSE: Shoot · E: Interact/Secret<br>
+      WARNING: Physics Gore & Glitch Effects Enabled.
     </div>
-
-    <div id="ui-layer">
-        <div>HEALTH: <span id="hp-val">100</span>%</div>
-        <div id="sanity-meter"><div id="sanity-fill"></div></div>
-        <div style="margin-top:5px; font-size: 14px; opacity: 0.7;">DISTANCE TO DAUGHTER: <span id="dist-val">666</span>m</div>
+    <div class="gRow">
+      <div><label>IDENTITY</label><input id="inName" value="PATIENT" maxlength="10"></div>
+      <div><label>MISSION</label><select id="inMission"><option value="SURVIVE_120">Survive 2:00</option><option value="SAVE_CHILD">Save Daughter</option><option value="REACH_EXIT">Reach Exit</option></select></div>
     </div>
+    <div style="margin-top:20px;display:flex;justify-content:space-between">
+      <button class="gBtn" id="btnScores">LEADERBOARD</button>
+      <button class="gBtn" id="btnStart" style="border-color:#7d3cff;color:#fff">INITIATE THERAPY</button>
+    </div>
+  </div>
+</div>
 
-    <div id="narrator-text"></div>
-    <canvas id="gameCanvas"></canvas>
+<div id="scores" class="gOverlay" style="display:none">
+  <div class="gPanel">
+    <h1>PATIENT RECORDS</h1>
+    <div id="scoreList"></div>
+    <div style="margin-top:20px;text-align:right"><button class="gBtn" onclick="document.getElementById('scores').style.display='none'">CLOSE</button></div>
+  </div>
+</div>
+
+<div id="end" class="gOverlay" style="display:none">
+  <div class="gPanel" style="text-align:center">
+    <h1 id="endTitle">SIGNAL LOST</h1>
+    <div id="endBody" style="white-space:pre-wrap;margin:15px 0;line-height:1.4;font-size:12px"></div>
+    <div id="endAutopsy" style="font-size:11px;color:#666;margin-top:10px;text-align:left;border-top:1px solid #333;padding-top:10px"></div>
+    <button class="gBtn" style="margin-top:20px" onclick="location.reload()">REBOOT</button>
+  </div>
+</div>
 
 <script>
-    // --- AUDIO SYSTEM (Procedural Horror Synths) ---
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    function playSound(type) {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
+(() => {
+  "use strict";
 
-        const now = audioCtx.currentTime;
+  // --- UTILS ---
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const lerp = (a,b,t) => a + (b-a)*t;
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const randi = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+  const chance = (p) => Math.random() < p;
+  const dist = (ax,ay,bx,by) => Math.hypot(ax-bx, ay-by);
+  const aabb = (ax,ay,aw,ah,bx,by,bw,bh) => ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+
+  // --- LEADERBOARD ---
+  const Leaderboard = {
+    key: "ASYLUM_DC_SCORES",
+    data: JSON.parse(localStorage.getItem("ASYLUM_DC_SCORES")||"[]"),
+    add(name, score, mission, res){
+      this.data.push({name, score, mission, res});
+      this.data.sort((a,b)=>b.score-a.score);
+      this.data = this.data.slice(0,10);
+      localStorage.setItem(this.key, JSON.stringify(this.data));
+    },
+    html(){
+      if(!this.data.length) return "No records found.";
+      return `<table><tr><th>NAME</th><th>SCORE</th><th>RESULT</th></tr>` + 
+        this.data.map(d=>`<tr><td>${d.name}</td><td style="color:#7d3cff">${d.score}</td><td>${d.res}</td></tr>`).join("") + `</table>`;
+    }
+  };
+
+  // --- CANVAS & AUDIO ---
+  const canvas = document.createElement("canvas");
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d", {alpha:false});
+  const buf = document.createElement("canvas"); // Low-res buffer
+  const RW=480, RH=270;
+  buf.width=RW; buf.height=RH;
+  const bctx = buf.getContext("2d", {alpha:false});
+
+  let W, H, SCALE, DX, DY;
+  const resize = () => {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    SCALE = Math.max(1, Math.floor(Math.min(W/RW, H/RH)));
+    DX = (W - RW*SCALE)/2; DY = (H - RH*SCALE)/2;
+    ctx.imageSmoothingEnabled = false;
+  };
+  window.onresize = resize; resize();
+
+  const AudioSys = {
+    ctx: null, master: null,
+    init(){
+      if(this.ctx) return;
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.master = this.ctx.createGain();
+      this.master.connect(this.ctx.destination);
+      this.master.gain.value = 0.3;
+      // Start Procedural Industrial Drone
+      const osc = this.ctx.createOscillator(); osc.type="sawtooth"; osc.frequency.value=55;
+      const lpf = this.ctx.createBiquadFilter(); lpf.type="lowpass"; lpf.frequency.value=120;
+      const lfo = this.ctx.createOscillator(); lfo.frequency.value=0.2; 
+      const lfoG = this.ctx.createGain(); lfoG.gain.value=50;
+      lfo.connect(lfoG).connect(lpf.frequency);
+      osc.connect(lpf).connect(this.master);
+      osc.start(); lfo.start();
+    },
+    play(kind){
+      if(!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.connect(g).connect(this.master);
+      
+      if(kind==="shoot"){
+        o.type="square"; o.frequency.setValueAtTime(400,t); o.frequency.exponentialRampToValueAtTime(100,t+0.1);
+        g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+        o.start(t); o.stop(t+0.1);
+      } else if(kind==="hit"){
+        o.type="sawtooth"; o.frequency.setValueAtTime(100,t); o.frequency.linearRampToValueAtTime(0,t+0.1);
+        g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+        o.start(t); o.stop(t+0.15);
+      } else if(kind==="glass"){
+        o.type="triangle"; o.frequency.setValueAtTime(2000,t); o.frequency.exponentialRampToValueAtTime(500,t+0.1);
+        g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+        o.start(t); o.stop(t+0.1);
+      } else if(kind==="glitch"){
+        o.type="sawtooth"; o.frequency.setValueAtTime(rand(200,800),t);
+        g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
+        o.start(t); o.stop(t+0.05);
+      }
+    }
+  };
+
+  // --- VISUAL FX ---
+  class VisualFX {
+    constructor(){
+      this.particles = [];
+      this.decals = [];
+      this.glitchT = 0;
+      this.rgbShift = 0;
+    }
+    triggerGlitch(amt){ this.glitchT=amt; this.rgbShift=amt*10; AudioSys.play("glitch"); }
+    spawnParticle(x,y,kind,color){
+      const p = {x,y,kind, vx:rand(-120,120), vy:rand(-200,-50), life:rand(0.5,1.5), color:color||"#fff", sz:rand(1,3)};
+      if(kind==="blood"){ p.vy = rand(-150,50); p.sz=2; } // Blood physics
+      if(kind==="debris"){ p.sz=rand(2,4); }
+      this.particles.push(p);
+    }
+    spawnDecal(x,y,kind){
+      if(this.decals.length>60) this.decals.shift();
+      this.decals.push({x,y,kind, w:rand(4,10), h:rand(2,4)});
+    }
+    update(dt, groundY){
+      this.glitchT = Math.max(0, this.glitchT-dt);
+      this.rgbShift = Math.max(0, this.rgbShift-dt*5);
+      
+      for(let i=this.particles.length-1; i>=0; i--){
+        let p = this.particles[i];
+        p.life -= dt;
+        p.x += p.vx*dt;
+        p.y += p.vy*dt;
+        p.vy += 800*dt; // Gravity
         
-        if (type === 'shoot') {
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(400, now);
-            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.1, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-            osc.start(now);
-            osc.stop(now + 0.1);
-        } else if (type === 'hit') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(100, now);
-            osc.frequency.linearRampToValueAtTime(50, now + 0.2);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
-            osc.start(now);
-            osc.stop(now + 0.2);
-        } else if (type === 'glitch') {
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(Math.random() * 1000, now);
-            gain.gain.setValueAtTime(0.05, now);
-            osc.start(now);
-            osc.stop(now + 0.05);
+        // Physics collision for blood/debris
+        if((p.kind==="blood" || p.kind==="debris") && p.y >= groundY){
+          p.y = groundY;
+          p.vx *= 0.5; // Friction
+          p.vy *= -0.3; // Bounce
+          if(Math.abs(p.vy) < 20) p.vy = 0;
+          
+          if(p.kind==="blood" && Math.abs(p.vx)<5 && Math.abs(p.vy)<5){
+            this.spawnDecal(p.x, groundY, "blood");
+            p.life = 0; // Convert to decal
+          }
         }
+        if(p.life<=0) this.particles.splice(i,1);
+      }
     }
-
-    // --- GAME ENGINE ---
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    let state = {
-        running: false,
-        frames: 0,
-        player: { x: 50, y: 0, w: 30, h: 50, vx: 0, vy: 0, hp: 100, sanity: 100, grounded: false },
-        bullets: [],
-        enemies: [],
-        particles: [],
-        camX: 0,
-        distance: 666,
-        difficulty: 1
-    };
-
-    const keys = {};
-    const GRAVITY = 0.8;
-    const SPEED = 5;
-    const JUMP = -14;
-
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+    draw(ctx, camx){
+      for(let d of this.decals){
+        ctx.fillStyle = d.kind==="blood"?"#7a0a0a":"#333";
+        ctx.fillRect(d.x-camx-d.w/2, d.y-d.h/2, d.w, d.h);
+      }
+      for(let p of this.particles){
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x-camx, p.y, p.sz, p.sz);
+      }
     }
-    window.addEventListener('resize', resize);
-    resize();
-
-    window.addEventListener('keydown', e => keys[e.code] = true);
-    window.addEventListener('keyup', e => keys[e.code] = false);
-
-    function startGame() {
-        document.getElementById('start-screen').style.display = 'none';
-        state.running = true;
-        state.player.y = canvas.height - 100;
-        loop();
-        narratorLoop();
+    postProcess(ctx){
+      if(this.rgbShift > 0.5){
+        const s = this.rgbShift|0;
+        ctx.globalCompositeOperation = "screen";
+        ctx.drawImage(ctx.canvas, -s, 0); // Cyan shift
+        ctx.drawImage(ctx.canvas, s, 0);  // Red shift
+        ctx.globalCompositeOperation = "source-over";
+      }
+      if(this.glitchT > 0.1){
+        for(let i=0; i<5; i++){
+          const y = randi(0,RH); const h=randi(2,15); const o=randi(-10,10);
+          ctx.drawImage(ctx.canvas, 0,y,RW,h, o,y,RW,h);
+        }
+      }
     }
+  }
 
-    // --- LOGIC ---
-    function update() {
-        if(!state.running) return;
-        state.frames++;
+  // --- ENTITIES ---
+  class Entity {
+    constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; this.vx=0; this.vy=0; this.hp=1; this.dead=false; }
+    get cx(){ return this.x+this.w/2; }
+    get cy(){ return this.y+this.h/2; }
+  }
 
-        // Difficulty ramp up
-        if (state.frames % 600 === 0) state.difficulty += 0.5;
-        if (state.frames % 10 === 0 && state.distance > 0) state.distance--;
-
-        // Player Physics
-        if (keys['ArrowLeft']) state.player.vx = -SPEED;
-        else if (keys['ArrowRight']) state.player.vx = SPEED;
-        else state.player.vx = 0;
-
-        if (keys['Space'] && state.player.grounded) {
-            state.player.vy = JUMP;
-            state.player.grounded = false;
-        }
-
-        // Shooting
-        if (keys['KeyZ'] && state.frames % 15 === 0) {
-            state.bullets.push({ x: state.player.x + state.player.w, y: state.player.y + 15, vx: 12, life: 100 });
-            playSound('shoot');
-            state.player.sanity -= 1; // Shooting costs sanity
-        }
-
-        // Apply Physics
-        state.player.vy += GRAVITY;
-        state.player.x += state.player.vx;
-        state.player.y += state.player.vy;
-
-        // Floor Collision
-        const floorY = canvas.height - 100;
-        if (state.player.y + state.player.h > floorY) {
-            state.player.y = floorY - state.player.h;
-            state.player.vy = 0;
-            state.player.grounded = true;
-        }
-
-        // Boundaries
-        if (state.player.x < 0) state.player.x = 0;
-        if (state.player.x > canvas.width - state.player.w) state.player.x = canvas.width - state.player.w;
-
-        // Enemy Spawning
-        if (Math.random() < 0.02 * state.difficulty) {
-            const type = Math.random() > 0.7 ? 'flyer' : 'runner';
-            state.enemies.push({
-                x: canvas.width + 50,
-                y: type === 'runner' ? floorY - 40 : floorY - 150 - Math.random()*100,
-                w: 40, h: 40,
-                vx: -(2 + Math.random() * state.difficulty),
-                type: type,
-                hp: type === 'tank' ? 3 : 1
-            });
-        }
-
-        // Bullets Logic
-        for (let i = state.bullets.length - 1; i >= 0; i--) {
-            let b = state.bullets[i];
-            b.x += b.vx;
-            if (b.x > canvas.width) state.bullets.splice(i, 1);
-        }
-
-        // Enemy Logic
-        for (let i = state.enemies.length - 1; i >= 0; i--) {
-            let e = state.enemies[i];
-            e.x += e.vx;
-            
-            // Player Hit
-            if (rectIntersect(state.player, e)) {
-                state.player.hp -= 10;
-                state.player.sanity -= 10;
-                playSound('hit');
-                shakeScreen(10);
-                state.enemies.splice(i, 1);
-                createParticles(state.player.x, state.player.y, 10, '#f00');
-                continue;
-            }
-
-            // Bullet Hit
-            for (let j = state.bullets.length - 1; j >= 0; j--) {
-                let b = state.bullets[j];
-                if (rectIntersect(b, e)) {
-                    state.enemies.splice(i, 1);
-                    state.bullets.splice(j, 1);
-                    createParticles(e.x, e.y, 8, '#0f0'); // Alien blood
-                    playSound('glitch');
-                    state.player.sanity += 2; // Killing gives false relief
-                    break;
-                }
-            }
-
-            if (e.x < -50) state.enemies.splice(i, 1);
-        }
-
-        // Particles
-        state.particles.forEach((p, index) => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life--;
-            if (p.life <= 0) state.particles.splice(index, 1);
-        });
-
-        // Game Over Check
-        if (state.player.hp <= 0 || state.player.sanity <= 0) {
-            state.running = false;
-            alert("SUBJECT DECEASED. SANITY LEVELS CRITICAL.");
-            location.reload();
-        }
-
-        // Win
-        if (state.distance <= 0) {
-            state.running = false;
-            alert("YOU FOUND HER. (But she doesn't recognize you.)");
-            location.reload();
-        }
-
-        updateUI();
+  class Prop extends Entity {
+    constructor(x,y,kind){
+      super(x,y,0,0);
+      this.kind=kind; this.broken=false;
+      if(kind==="bed"){ this.w=32; this.h=16; this.hp=15; }
+      else if(kind==="iv"){ this.w=10; this.h=32; this.hp=5; }
+      else if(kind==="monitor"){ this.w=16; this.h=16; this.hp=10; }
+      else if(kind==="cabinet"){ this.w=24; this.h=32; this.hp=12; }
+      this.y = y - this.h;
     }
+    hit(dmg, game){
+      if(this.broken) return;
+      this.hp -= dmg;
+      game.fx.spawnParticle(this.cx, this.cy, "spark");
+      if(this.hp<=0){
+        this.broken=true;
+        game.score += 50;
+        AudioSys.play("glass");
+        game.fx.triggerGlitch(0.1);
+        for(let i=0;i<8;i++) game.fx.spawnParticle(this.cx, this.cy, "debris", i%2==0?"#555":"#888");
+      }
+    }
+    draw(ctx, camx){
+      const x = (this.x - camx)|0; const y = this.y|0;
+      if(this.broken){ ctx.fillStyle="#222"; ctx.fillRect(x, y+this.h-4, this.w, 4); return; }
+      
+      if(this.kind==="bed"){
+        ctx.fillStyle="#ccc"; ctx.fillRect(x,y+6,this.w,4); // Mattress
+        ctx.fillStyle="#334"; ctx.fillRect(x,y+10,this.w,6); // Frame
+        ctx.fillStyle="#445"; ctx.fillRect(x,y,4,16); // Headboard
+      } else if(this.kind==="iv"){
+        ctx.fillStyle="#888"; ctx.fillRect(x+4,y,2,32);
+        ctx.fillStyle="#aaf"; ctx.fillRect(x+2,y+2,6,10);
+      } else if(this.kind==="monitor"){
+        ctx.fillStyle="#111"; ctx.fillRect(x,y,16,14);
+        ctx.fillStyle="#0f0"; ctx.fillRect(x+2,y+6,12,1); // Line
+        ctx.fillStyle="#444"; ctx.fillRect(x+6,y+14,4,2);
+      } else if(this.kind==="cabinet"){
+        ctx.fillStyle="#5d4037"; ctx.fillRect(x,y,24,32);
+        ctx.fillStyle="#3e2723"; ctx.fillRect(x+2,y+2,20,28);
+      }
+    }
+  }
 
-    function draw() {
-        // Clear (with trail effect based on sanity)
-        ctx.fillStyle = state.player.sanity < 50 ? 'rgba(5, 5, 5, 0.2)' : '#050505';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+  class Enemy extends Entity {
+    constructor(x,y,type){
+      super(x,y,18,28);
+      this.type=type; 
+      this.hp = type==="boss"?500:(type==="anesthesiologist"?25:20);
+      this.maxHp = this.hp;
+      this.timer=0;
+    }
+    update(dt, game){
+      this.timer+=dt;
+      const dist = game.player.x - this.x;
+      
+      // Madness: Enemies harmless
+      if(game.madness) {
+        this.vx = Math.sin(game.time*2 + this.x)*20;
+        return;
+      }
 
-        // Draw Floor
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-
-        // Sanity Glitch Effects
-        if (state.player.sanity < 40 && Math.random() > 0.9) {
-            ctx.filter = 'invert(1)';
+      if(this.type==="anesthesiologist"){
+        if(Math.abs(dist) < 180 && Math.abs(dist) > 60){
+          this.vx = 0;
+          if(this.timer > 2.5){
+            this.timer=0;
+            const ang = Math.atan2((game.player.y+10)-this.y, game.player.x-this.x);
+            game.projectiles.push({x:this.x, y:this.y+10, vx:Math.cos(ang)*250, vy:Math.sin(ang)*250, kind:"syringe", life:2});
+          }
         } else {
-            ctx.filter = 'none';
+          this.vx = sign(dist)*40;
+        }
+      } else {
+        this.vx = sign(dist)*60;
+      }
+      this.x += this.vx*dt;
+      this.y += 800*dt*dt; // Fake gravity
+    }
+    draw(ctx, camx){
+      const x=(this.x-camx)|0; const y=this.y|0;
+      if(this.type==="anesthesiologist"){
+        ctx.fillStyle="#aaf"; ctx.fillRect(x,y,18,28); // Scrubs
+        ctx.fillStyle="#fff"; ctx.fillRect(x+4,y+4,10,6); // Mask
+      } else if(this.type==="boss"){
+        ctx.fillStyle="#800"; ctx.fillRect(x,y-30,40,60); // Big Box
+      } else {
+        ctx.fillStyle="#400"; ctx.fillRect(x,y,18,28); // Rusher
+      }
+    }
+  }
+
+  // --- GAME CLASS ---
+  class Game {
+    constructor(){
+      this.state="menu";
+      this.player={x:0,y:0,w:16,h:28,vx:0,vy:0,hp:100,san:100,sleepT:0};
+      this.groundY=220;
+      this.camx=0;
+      this.score=0;
+      this.time=0;
+      this.fx=new VisualFX();
+      this.props=[]; this.enemies=[]; this.projectiles=[]; this.graffiti=[]; this.secrets=[];
+      this.madness=false;
+      this.daughter={saved:false, x:-999};
+      
+      this.input={keys:{}, m:{x:0,y:0,down:false}};
+      this.cheatBuf="";
+      
+      window.onkeydown=e=>{
+        this.input.keys[e.code]=true;
+        if(this.state==="play"){
+          if(e.code==="KeyE") this.interact();
+          this.cheatBuf += e.key.toUpperCase();
+          if(this.cheatBuf.length>10) this.cheatBuf=this.cheatBuf.slice(-10);
+          if(this.cheatBuf.endsWith("IDDQD")){ this.player.hp=999; this.toast("GOD MODE"); }
+          if(this.cheatBuf.endsWith("MOTHER")){ this.player.san=999; this.toast("SANITY FULL"); }
+        }
+      };
+      window.onkeyup=e=>this.input.keys[e.code]=false;
+      window.onmousemove=e=>{
+        const r=canvas.getBoundingClientRect();
+        this.input.m.x=(e.clientX-r.left-DX)/SCALE;
+        this.input.m.y=(e.clientY-r.top-DY)/SCALE;
+      };
+      window.onmousedown=()=>this.input.m.down=true;
+      window.onmouseup=()=>this.input.m.down=false;
+    }
+
+    toast(msg){ document.querySelector(".toast").textContent=msg; document.querySelector(".toast").classList.add("show"); setTimeout(()=>document.querySelector(".toast").classList.remove("show"),2000); }
+
+    start(mission){
+      this.state="play"; this.mission=mission; this.score=0; this.time=0;
+      this.player.x=100; this.player.y=100; this.player.hp=100; this.player.san=100; this.player.sleepT=0;
+      this.props=[]; this.enemies=[]; this.projectiles=[]; this.graffiti=[]; this.secrets=[];
+      this.madness=false;
+      
+      // Gen Level
+      for(let x=300; x<5000; x+=rand(60,150)){
+        if(chance(0.25)) this.props.push(new Prop(x, this.groundY, ["bed","cabinet","iv","monitor"][randi(0,3)]));
+        if(chance(0.15)) this.enemies.push(new Enemy(x, this.groundY-28, chance(0.4)?"anesthesiologist":"rusher"));
+        if(chance(0.08)) this.graffiti.push({x, y:rand(60,150), txt:["RUN","LIES","IT HURTS","NO EXIT"][randi(0,3)]});
+        if(chance(0.03)) this.secrets.push({x, y:this.groundY-30, w:24, h:32});
+      }
+      
+      if(mission==="SAVE_CHILD") this.daughter = {x:4800, y:this.groundY-26, saved:false, w:16, h:26};
+    }
+
+    update(dt){
+      if(this.state!=="play") return;
+      this.time += dt;
+      const p = this.player;
+
+      // Sleep Status
+      if(p.sleepT > 0){
+        p.sleepT -= dt;
+        return; 
+      }
+
+      // Madness Trigger (Low Sanity)
+      if(p.san < 30 && !this.madness && chance(0.01)){
+        this.madness=true;
+        this.fx.triggerGlitch(2.0);
+        this.toast("MADNESS STARTED");
+        AudioSys.play("glitch");
+      }
+      if(this.madness && p.san > 50) this.madness=false;
+
+      // Player Controls
+      if(this.input.keys["KeyA"] || this.input.keys["ArrowLeft"]) p.vx = -120;
+      else if(this.input.keys["KeyD"] || this.input.keys["ArrowRight"]) p.vx = 120;
+      else p.vx = 0;
+
+      if((this.input.keys["Space"]||this.input.keys["ArrowUp"]) && p.grounded){
+        p.vy = -350; p.grounded=false;
+      }
+
+      p.vy += 800*dt;
+      p.x += p.vx*dt; p.y += p.vy*dt;
+
+      // Ground Collision
+      if(p.y+p.h >= this.groundY){ p.y=this.groundY-p.h; p.vy=0; p.grounded=true; }
+      else p.grounded=false;
+
+      // Camera
+      this.camx = lerp(this.camx, p.x - RW/3, 0.1);
+
+      // Shooting
+      if(this.input.m.down){
+        this.input.m.down=false; // Semi-auto
+        const ang = Math.atan2(this.input.m.y - (p.y+10), (this.input.m.x+this.camx) - p.x);
+        this.projectiles.push({x:p.x+8, y:p.y+10, vx:Math.cos(ang)*600, vy:Math.sin(ang)*600, kind:"bullet", life:1});
+        AudioSys.play("shoot");
+      }
+
+      // Entities
+      this.enemies.forEach(e => {
+        e.update(dt, this);
+        if(e.y+e.h >= this.groundY) e.y=this.groundY-e.h;
+        
+        // Touch Damage (Disabled in Madness)
+        if(!e.dead && !this.madness && aabb(p.x,p.y,p.w,p.h, e.x,e.y,e.w,e.h)){
+          this.hitPlayer(10);
+        }
+      });
+
+      // Projectiles
+      for(let i=this.projectiles.length-1; i>=0; i--){
+        let pr = this.projectiles[i];
+        pr.life -= dt;
+        pr.x += pr.vx*dt; pr.y += pr.vy*dt;
+
+        // Player Hit (Syringe)
+        if(pr.kind==="syringe" && aabb(pr.x,pr.y,4,4, p.x,p.y,p.w,p.h)){
+          p.sleepT = 2.0;
+          this.hitPlayer(5);
+          this.toast("SEDATED...");
+          pr.life=0;
         }
 
-        // Draw Player
-        ctx.fillStyle = '#0f0'; // Neon Green
-        ctx.fillRect(state.player.x, state.player.y, state.player.w, state.player.h);
-        
-        // Draw Enemies
-        state.enemies.forEach(e => {
-            ctx.fillStyle = e.type === 'flyer' ? '#f0f' : '#f00'; // Magenta/Red
-            ctx.fillRect(e.x, e.y, e.w, e.h);
-            // Draw Glitch Eyes
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(e.x + 5, e.y + 10, 5, 5);
-        });
-
-        // Draw Bullets
-        ctx.fillStyle = '#ff0';
-        state.bullets.forEach(b => ctx.fillRect(b.x, b.y, 8, 4));
-
-        // Draw Particles
-        state.particles.forEach(p => {
-            ctx.fillStyle = p.c;
-            ctx.fillRect(p.x, p.y, 3, 3);
-        });
-    }
-
-    function loop() {
-        if(!state.running) return;
-        update();
-        draw();
-        requestAnimationFrame(loop);
-    }
-
-    // --- HELPERS ---
-    function rectIntersect(r1, r2) {
-        return !(r2.x > r1.x + (r1.w || 8) || 
-                 r2.x + r2.w < r1.x || 
-                 r2.y > r1.y + (r1.h || 4) || 
-                 r2.y + r2.h < r1.y);
-    }
-
-    function createParticles(x, y, count, color) {
-        for(let i=0; i<count; i++) {
-            state.particles.push({
-                x: x, y: y,
-                vx: (Math.random() - 0.5) * 10,
-                vy: (Math.random() - 0.5) * 10,
-                life: 20,
-                c: color
-            });
+        // Enemy/Prop Hit (Bullet)
+        if(pr.kind==="bullet"){
+          for(let prop of this.props) if(!prop.broken && aabb(pr.x,pr.y,4,4, prop.x,prop.y,prop.w,prop.h)){
+            prop.hit(5, this); pr.life=0;
+          }
+          for(let e of this.enemies) if(!e.dead && !this.madness && aabb(pr.x,pr.y,4,4, e.x,e.y,e.w,e.h)){
+            e.hp -= 5;
+            this.fx.spawnParticle(e.x+e.w/2, e.y+e.h/2, "blood");
+            if(e.hp<=0){
+              e.dead=true;
+              this.score+=100;
+              for(let k=0;k<10;k++) this.fx.spawnParticle(e.x,e.y,"blood"); // Gore
+            }
+            pr.life=0;
+          }
         }
+        if(pr.life<=0) this.projectiles.splice(i,1);
+      }
+
+      // Cleanup
+      this.enemies = this.enemies.filter(e=>!e.dead);
+
+      // Win/Lose
+      if(p.hp<=0 || p.san<=0) this.end("LOSE");
+      if(this.mission==="REACH_EXIT" && p.x > 5000) this.end("WIN");
+      if(this.mission==="SURVIVE_120" && this.time > 120) this.end("WIN");
     }
 
-    function shakeScreen(amount) {
-        canvas.style.transform = `translate(${Math.random()*amount - amount/2}px, ${Math.random()*amount - amount/2}px)`;
-        setTimeout(() => canvas.style.transform = 'none', 50);
+    interact(){
+      const p = this.player;
+      // Daughter
+      if(this.daughter.x > 0 && !this.daughter.saved && dist(p.x,p.y, this.daughter.x, this.daughter.y)<40){
+        this.daughter.saved=true;
+        this.score+=1000;
+        this.toast("DAUGHTER SAVED");
+        if(this.mission==="SAVE_CHILD") this.end("WIN");
+      }
+      // Secrets
+      for(let s of this.secrets){
+        if(aabb(p.x,p.y,p.w,p.h, s.x,s.y,s.w,s.h)){
+          this.toast("SECRET ROOM FOUND");
+          this.score+=500;
+          p.x += 10000; // Warp
+          this.camx = p.x-100;
+          this.props.push(new Prop(p.x+50, this.groundY, "cabinet")); // Loot
+          return;
+        }
+      }
     }
 
-    function updateUI() {
-        document.getElementById('hp-val').innerText = Math.floor(state.player.hp);
-        const sanFill = document.getElementById('sanity-fill');
-        sanFill.style.width = state.player.sanity + '%';
-        document.getElementById('dist-val').innerText = state.distance;
-        
-        if(state.player.sanity < 30) sanFill.style.backgroundColor = '#f00';
-        else sanFill.style.backgroundColor = '#0f0';
+    hitPlayer(dmg){
+      this.player.hp -= dmg;
+      this.player.san -= dmg*0.5;
+      this.fx.triggerGlitch(0.2);
+      this.fx.spawnParticle(this.player.x, this.player.y, "blood");
+      AudioSys.play("hit");
     }
 
-    // --- NARRATOR SYSTEM ---
-    const lines = [
-        "Why do you keep running?",
-        "There is no daughter.",
-        "The doctor is watching.",
-        "Press 'Z' to give up.",
-        "Look behind you.",
-        "SYSTEM ERROR: HOPE NOT FOUND"
-    ];
-
-    function narratorLoop() {
-        if(!state.running) return;
-        const el = document.getElementById('narrator-text');
-        
-        // Randomly show text
-        setTimeout(() => {
-            el.innerText = lines[Math.floor(Math.random() * lines.length)];
-            el.style.display = 'block';
-            playSound('glitch');
-            setTimeout(() => el.style.display = 'none', 3000);
-            narratorLoop();
-        }, 5000 + Math.random() * 5000);
+    end(res){
+      this.state="end";
+      document.getElementById("end").style.display="grid";
+      document.getElementById("endTitle").textContent = res==="WIN"?"MISSION COMPLETE":"TERMINATED";
+      document.getElementById("endBody").textContent = `FINAL SCORE: ${this.score}\n\n` + (res==="WIN"?"The files are secured.":"Subject Expired.");
+      
+      const autopsy = [];
+      if(this.player.hp<20) autopsy.push("Massive trauma detected.");
+      if(this.player.san<20) autopsy.push("Complete psychological collapse.");
+      if(this.madness) autopsy.push("Subject experienced severe hallucinations.");
+      document.getElementById("endAutopsy").textContent = "AUTOPSY: " + autopsy.join(" ");
+      
+      Leaderboard.add(document.getElementById("inName").value, this.score, this.mission, res);
     }
 
+    draw(){
+      // Clear
+      bctx.fillStyle="#000"; bctx.fillRect(0,0,RW,RH);
+      
+      if(this.player.sleepT > 0){
+        // Sleep Fade
+        bctx.fillStyle = `rgba(0,0,0,${Math.min(1, this.player.sleepT)})`;
+        bctx.fillRect(0,0,RW,RH);
+      }
+
+      // Parallax Graffiti
+      bctx.save();
+      bctx.fillStyle="rgba(255,255,255,0.15)";
+      bctx.font="10px monospace";
+      for(let g of this.graffiti){
+        if(g.x-this.camx > -50 && g.x-this.camx < RW+50)
+          bctx.fillText(g.txt, (g.x-this.camx*0.8)|0, g.y);
+      }
+      bctx.restore();
+
+      // Secrets
+      bctx.fillStyle="#151515";
+      for(let s of this.secrets) bctx.fillRect((s.x-this.camx)|0, s.y, s.w, s.h);
+
+      // Floor
+      bctx.fillStyle="#222"; bctx.fillRect(0, this.groundY, RW, RH-this.groundY);
+
+      this.fx.draw(bctx, this.camx);
+      for(let p of this.props) p.draw(bctx, this.camx);
+      for(let e of this.enemies) e.draw(bctx, this.camx);
+      
+      // Daughter
+      if(this.daughter.x > 0){
+        const dx = (this.daughter.saved ? this.player.x-10 : this.daughter.x) - this.camx;
+        const dy = (this.daughter.saved ? this.player.y : this.daughter.y);
+        bctx.fillStyle="#0fa"; bctx.fillRect(dx|0, dy|0, 14, 24); // Green dress
+      }
+
+      // Player
+      bctx.fillStyle=this.player.sleepT>0?"#448":"#fff";
+      bctx.fillRect((this.player.x-this.camx)|0, this.player.y|0, 16, 28);
+      
+      // Projectiles
+      for(let p of this.projectiles){
+        bctx.fillStyle = p.kind==="bullet"?"#ff0":"#0f0";
+        bctx.fillRect((p.x-this.camx)|0, p.y|0, 4, 2);
+      }
+
+      // Post
+      this.fx.postProcess(bctx);
+
+      // Blit
+      ctx.drawImage(buf, 0,0,RW,RH, DX,DY, RW*SCALE, RH*SCALE);
+
+      // UI Updates
+      document.getElementById("uiHp").style.width = clamp(this.player.hp,0,100)+"%";
+      document.getElementById("uiSan").style.width = clamp(this.player.san,0,100)+"%";
+      document.getElementById("uiScore").textContent = this.score.toString().padStart(6,"0");
+      document.getElementById("uiMadness").style.display = this.madness?"block":"none";
+    }
+  }
+
+  // --- INIT ---
+  const game = new Game();
+  let lastT = 0;
+  function loop(t){
+    const dt = Math.min(0.1, (t-lastT)/1000);
+    lastT = t;
+    game.update(dt);
+    game.draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  document.getElementById("btnStart").onclick = () => {
+    AudioSys.init();
+    document.getElementById("menu").style.display="none";
+    game.start(document.getElementById("inMission").value);
+  };
+  document.getElementById("btnScores").onclick = () => {
+    document.getElementById("scores").style.display="grid";
+    document.getElementById("scoreList").innerHTML = Leaderboard.html();
+  };
+
+})();
 </script>
 </body>
 </html>
