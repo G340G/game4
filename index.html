@@ -2,140 +2,75 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VITAL SIGNS: ZERO // TERMINAL LINK</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE LIMINAL ARCHIVE // PS2 HORROR</title>
     <style>
-        /* --- PROFESSIONAL CSS RESET & CRT STYLING --- */
-        :root {
-            --term-green: #33ff00;
-            --term-red: #ff3333;
-            --term-bg: #050505;
-            --scanline-color: rgba(0, 0, 0, 0.5);
-        }
-
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--term-bg);
-            overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
-            cursor: crosshair;
-            user-select: none;
-        }
-
-        /* The Game Container */
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* The Canvas: Low Res scaled up with sharp pixels */
-        canvas {
-            image-rendering: pixelated;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-            z-index: 1;
-        }
-
-        /* UI Overlay Layer */
-        #ui-layer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 10;
-            padding: 20px;
-            box-sizing: border-box;
-            text-shadow: 0 0 5px var(--term-green);
-            color: var(--term-green);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        /* HUD Elements */
-        .hud-top { display: flex; justify-content: space-between; font-weight: bold; font-size: 20px; }
-        .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+        :root { --scan-color: rgba(0, 0, 0, 0.5); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; user-select: none; }
         
-        .bar-container { width: 200px; height: 15px; border: 2px solid var(--term-green); background: #001100; margin-bottom: 5px; }
-        .bar-fill { height: 100%; background: var(--term-green); transition: width 0.1s linear; }
-        .bar-fill.critical { background: var(--term-red); box-shadow: 0 0 10px var(--term-red); animation: pulse 0.5s infinite; }
-
-        #log-area {
-            position: absolute;
-            bottom: 80px;
-            left: 20px;
-            width: 400px;
-            height: 150px;
-            overflow: hidden;
-            font-size: 14px;
-            opacity: 0.8;
-            border-left: 2px solid var(--term-green);
-            padding-left: 10px;
-            background: linear-gradient(90deg, rgba(0,20,0,0.5), transparent);
+        /* PS2 Low Res Container */
+        #game-container {
+            width: 100vw; height: 100vh;
+            display: flex; justify-content: center; align-items: center;
+            background: #000;
+        }
+        canvas {
+            image-rendering: pixelated; /* THE PS2 LOOK */
+            width: 100% !important; height: 100% !important;
+            filter: contrast(1.2) brightness(0.9) sepia(0.2);
         }
 
-        /* CRT Effects */
-        .scanlines {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        /* UI Overlays */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* CRT Scanlines */
+        #scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
             background-size: 100% 4px;
-            pointer-events: none;
-            z-index: 99;
+            pointer-events: none; opacity: 0.6;
         }
         
-        .vignette {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.8) 90%);
-            pointer-events: none;
-            z-index: 98;
+        /* HUD */
+        #hud {
+            position: absolute; bottom: 20px; left: 20px; color: #d0d0d0;
+            text-shadow: 2px 2px 0 #000; font-size: 18px; font-weight: bold;
         }
+        .bar { width: 200px; height: 10px; background: #333; margin-top: 5px; border: 1px solid #555; }
+        .fill { height: 100%; transition: width 0.2s; }
+        #hp-fill { background: #a00; width: 100%; }
+        #san-fill { background: #00a; width: 100%; }
 
-        .screen-glitch {
-            animation: glitch-anim 0.2s infinite;
-            display: none; /* Toggled by JS */
-            position: fixed; top:0; left:0; width:100%; height:100%;
-            background: rgba(255, 0, 0, 0.1);
-            z-index: 90;
-            pointer-events: none;
+        /* Dialog Box */
+        #dialog-box {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 60%; background: rgba(0,0,0,0.9);
+            border: 2px solid #fff; padding: 20px; color: #fff; text-align: center;
+            pointer-events: auto; cursor: default;
         }
+        .choice-btn {
+            background: #333; border: 1px solid #fff; color: #fff;
+            padding: 10px 20px; margin: 10px; cursor: pointer; font-family: inherit;
+        }
+        .choice-btn:hover { background: #fff; color: #000; }
 
-        /* Start Screen */
-        #menu-screen {
+        /* Start/Death Screen */
+        #overlay-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            color: #fff;
+            background: #000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: #fff; pointer-events: auto;
+            z-index: 10;
         }
+        h1 { font-size: 4em; letter-spacing: -5px; margin: 0; text-transform: uppercase; color: #d00; }
+        p { max-width: 600px; text-align: center; line-height: 1.5; }
+        button { background: #fff; color: #000; border: none; padding: 15px 30px; font-size: 1.2em; cursor: pointer; margin-top: 20px; font-family: 'Courier New'; font-weight: bold; }
         
-        h1 { font-size: 64px; margin: 0; text-shadow: 4px 4px 0 #333; letter-spacing: 5px; color: #ddd; }
-        .menu-btn {
-            margin-top: 30px;
-            padding: 15px 40px;
-            background: transparent;
-            border: 2px solid #fff;
-            color: #fff;
-            font-family: inherit;
-            font-size: 24px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .menu-btn:hover { background: #fff; color: #000; }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        @keyframes glitch-anim {
+        .glitch-text { animation: glitch 0.5s infinite; }
+        @keyframes glitch {
             0% { transform: translate(0); }
             20% { transform: translate(-2px, 2px); }
-            40% { transform: translate(2px, -2px); }
-            60% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
             80% { transform: translate(2px, -2px); }
             100% { transform: translate(0); }
         }
@@ -143,622 +78,592 @@
 </head>
 <body>
 
-    <div class="scanlines"></div>
-    <div class="vignette"></div>
-    <div id="glitch-overlay" class="screen-glitch"></div>
-
-    <div id="menu-screen">
-        <h1>VITAL SIGNS: ZERO</h1>
-        <p style="color: #888;">[ BIO-HAZARD CONTAINMENT PROTOCOL ]</p>
-        <p style="margin-top: 20px; font-size: 14px;">WASD: Move | MOUSE: Aim | CLICK: Fire | R: Reload | F: Flashlight</p>
-        <button class="menu-btn" onclick="Game.init()">INITIALIZE LINK</button>
-    </div>
-
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <div id="ui-layer">
-            <div class="hud-top">
-                <div id="sector-info">SECTOR: 7G [DEEP LABS]</div>
-                <div id="ammo-counter">AMMO: --/--</div>
-            </div>
-            
-            <div id="log-area">
-                </div>
-
-            <div class="hud-bottom">
-                <div>
-                    <div>VITAL INTEGRITY</div>
-                    <div class="bar-container"><div id="hp-bar" class="bar-fill"></div></div>
-                    <div>NEURAL COHERENCE</div>
-                    <div class="bar-container"><div id="coherence-bar" class="bar-fill" style="background:#00aaff"></div></div>
-                </div>
-                <div style="text-align: right;">
-                    <div id="threat-level" style="color:red; opacity:0;">THREAT DETECTED</div>
-                    <div>OBJ: PURGE DATA CORE</div>
-                </div>
-            </div>
+    <div id="game-container"></div>
+    
+    <div id="ui-layer">
+        <div id="scanlines"></div>
+        <div id="hud">
+            <div>PHYSICALITY</div>
+            <div class="bar"><div id="hp-fill" class="fill"></div></div>
+            <div style="margin-top:10px;">PSYCHE</div>
+            <div class="bar"><div id="san-fill" class="fill"></div></div>
         </div>
     </div>
 
-<script>
-/**
- * VITAL SIGNS: ZERO - Engine Core
- * A monolithic JS structure simulating a professional ECS-lite architecture.
- */
+    <div id="dialog-box">
+        <h2 id="npc-text"></h2>
+        <div id="npc-choices"></div>
+    </div>
 
-// --- MATH UTILITIES ---
-const MathUtils = {
-    lerp: (a, b, t) => a + (b - a) * t,
-    dist: (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2),
-    clamp: (num, min, max) => Math.min(Math.max(num, min), max),
-    rand: (min, max) => Math.random() * (max - min) + min,
-    randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
-};
+    <div id="overlay-screen">
+        <h1 class="glitch-text">LIMINAL</h1>
+        <p>ESCAPE THE ASYLUM. FIND THE GREEN EXIT.<br>DO NOT LET THE ENTITY TOUCH YOU.</p>
+        <p style="color:#888; font-size: 0.8em;">(HEADPHONES REQUIRED - INDUSTRIAL NOISE)</p>
+        <button id="start-btn">INITIATE SEQUENCE</button>
+    </div>
 
-// --- AUDIO SYSTEM (PROCEDURAL) ---
-// Generates horror ambience and SFX without external files to ensure zero-dependency running.
-class AudioSynth {
-    constructor() {
-        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.connect(this.ctx.destination);
-        this.masterGain.gain.value = 0.4;
-        this.initialized = false;
-    }
-
-    resume() {
-        if (this.ctx.state === 'suspended') this.ctx.resume();
-        this.initialized = true;
-        this.startAmbience();
-    }
-
-    startAmbience() {
-        // Industrial Drone
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        const filter = this.ctx.createBiquadFilter();
-        
-        osc.type = 'sawtooth';
-        osc.frequency.value = 50;
-        
-        filter.type = 'lowpass';
-        filter.frequency.value = 120;
-        
-        // LFO for throbbing effect
-        const lfo = this.ctx.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = 0.2;
-        const lfoGain = this.ctx.createGain();
-        lfoGain.gain.value = 100;
-        
-        lfo.connect(lfoGain).connect(filter.frequency);
-        
-        osc.connect(filter).connect(gain).connect(this.masterGain);
-        gain.gain.value = 0.15;
-        
-        osc.start();
-        lfo.start();
-    }
-
-    playShoot() {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
-        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
-        
-        osc.connect(gain).connect(this.masterGain);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.2);
-    }
-
-    playImpact() {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(20, this.ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
-        osc.connect(gain).connect(this.masterGain);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.1);
-    }
-
-    playScream() {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(200, this.ctx.currentTime + 0.4);
-        // Jitter the frequency for horror
-        for(let i=0; i<10; i++) {
-            osc.frequency.setValueAtTime(200 + Math.random()*500, this.ctx.currentTime + (i*0.05));
-        }
-        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
-        osc.connect(gain).connect(this.masterGain);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.6);
-    }
-}
-
-// --- INPUT HANDLER ---
-class InputHandler {
-    constructor() {
-        this.keys = {};
-        this.mouse = { x: 0, y: 0, down: false };
-        
-        window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
-        window.addEventListener('mousemove', e => {
-            const rect = Game.canvas.getBoundingClientRect();
-            // Scale mouse pos to internal resolution
-            this.mouse.x = (e.clientX - rect.left) * (Game.width / rect.width);
-            this.mouse.y = (e.clientY - rect.top) * (Game.height / rect.height);
-        });
-        window.addEventListener('mousedown', () => this.mouse.down = true);
-        window.addEventListener('mouseup', () => this.mouse.down = false);
-    }
-}
-
-// --- RENDERING SYSTEM (LIGHTING & GFX) ---
-class Renderer {
-    constructor(ctx, width, height) {
-        this.ctx = ctx;
-        this.width = width;
-        this.height = height;
-        // Offscreen canvas for lighting layer
-        this.lightCanvas = document.createElement('canvas');
-        this.lightCanvas.width = width;
-        this.lightCanvas.height = height;
-        this.lightCtx = this.lightCanvas.getContext('2d');
-    }
-
-    clear() {
-        this.ctx.fillStyle = '#050505'; // Dark background
-        this.ctx.fillRect(0, 0, this.width, this.height);
-    }
-
-    drawMap(walls) {
-        this.ctx.fillStyle = '#1a1a1a'; // Wall color
-        this.ctx.strokeStyle = '#2d2d2d';
-        walls.forEach(w => {
-            this.ctx.fillRect(w.x, w.y, w.w, w.h);
-            this.ctx.strokeRect(w.x, w.y, w.w, w.h);
-            // Grime details
-            if (w.x % 50 === 0) {
-                this.ctx.fillStyle = '#0f0f0f';
-                this.ctx.fillRect(w.x + 2, w.y, 2, w.h);
-                this.ctx.fillStyle = '#1a1a1a';
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
             }
-        });
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- GAME CONFIG & STATE ---
+        const config = {
+            resScale: 0.25, // Internal resolution scale (PS2 pixelation)
+            mazeSize: 21,   // Must be odd
+            speed: 5.0,
+            entitySpeed: 2.8
+        };
         
-        // Draw floor grid (subtle)
-        this.ctx.strokeStyle = '#0a0a0a';
-        this.ctx.beginPath();
-        for(let i=0; i<this.width; i+=40) {
-            this.ctx.moveTo(i, 0); this.ctx.lineTo(i, this.height);
-        }
-        for(let i=0; i<this.height; i+=40) {
-            this.ctx.moveTo(0, i); this.ctx.lineTo(this.width, i);
-        }
-        this.ctx.stroke();
-    }
+        let state = {
+            hp: 100,
+            sanity: 100,
+            isPlaying: false,
+            isDialog: false,
+            level: 1
+        };
 
-    drawBlood(decals) {
-        decals.forEach(d => {
-            this.ctx.fillStyle = `rgba(100, 0, 0, ${d.alpha})`;
-            this.ctx.beginPath();
-            this.ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-    }
+        // --- AUDIO SYSTEM (Procedural Industrial Noise) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let droneOsc, lfo, gainNode, noiseNode, filterNode;
 
-    drawEntities(entities, player) {
-        entities.forEach(e => e.draw(this.ctx));
-        player.draw(this.ctx);
-    }
-
-    // Professional Ray-casted/Gradient Lighting
-    drawLighting(player, entities) {
-        // Fill darkness
-        this.lightCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';
-        this.lightCtx.fillRect(0, 0, this.width, this.height);
-
-        // Flashlight beam
-        if (player.flashlightOn) {
-            this.lightCtx.globalCompositeOperation = 'destination-out';
-            const grad = this.lightCtx.createRadialGradient(
-                player.x, player.y, 10,
-                player.x + Math.cos(player.angle)*150, 
-                player.y + Math.sin(player.angle)*150, 
-                120
-            );
-            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        function initAudio() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
             
-            this.lightCtx.fillStyle = grad;
-            this.lightCtx.beginPath();
-            this.lightCtx.moveTo(player.x, player.y);
-            this.lightCtx.arc(player.x, player.y, 250, player.angle - 0.4, player.angle + 0.4);
-            this.lightCtx.fill();
+            // Deep Industrial Drone
+            droneOsc = audioCtx.createOscillator();
+            droneOsc.type = 'sawtooth';
+            droneOsc.frequency.value = 40;
+            
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.15;
+            
+            // LFO for dissonance
+            lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 0.1; 
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 10;
+            lfo.connect(lfoGain).connect(droneOsc.frequency);
+            
+            droneOsc.connect(gainNode).connect(audioCtx.destination);
+            lfo.start();
+            droneOsc.start();
+
+            // Static/Hiss (The "Air" of the asylum)
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            noiseNode = audioCtx.createBufferSource();
+            noiseNode.buffer = buffer;
+            noiseNode.loop = true;
+            
+            filterNode = audioCtx.createBiquadFilter();
+            filterNode.type = 'lowpass';
+            filterNode.frequency.value = 800;
+            
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.value = 0.05;
+
+            noiseNode.connect(filterNode).connect(noiseGain).connect(audioCtx.destination);
+            noiseNode.start();
         }
 
-        // Small glow around player
-        this.lightCtx.globalCompositeOperation = 'destination-out';
-        const pGlow = this.lightCtx.createRadialGradient(player.x, player.y, 5, player.x, player.y, 40);
-        pGlow.addColorStop(0, 'rgba(255,255,255,0.8)');
-        pGlow.addColorStop(1, 'rgba(255,255,255,0)');
-        this.lightCtx.fillStyle = pGlow;
-        this.lightCtx.beginPath();
-        this.lightCtx.arc(player.x, player.y, 40, 0, Math.PI*2);
-        this.lightCtx.fill();
-
-        // Enemy Eyes (Glowing Red in Dark)
-        this.lightCtx.globalCompositeOperation = 'source-over';
-        entities.forEach(e => {
-            if(e.type === 'enemy') {
-                this.lightCtx.fillStyle = 'red';
-                this.lightCtx.fillRect(e.x - 2, e.y - 5, 2, 2);
-                this.lightCtx.fillRect(e.x + 2, e.y - 5, 2, 2);
+        // --- PROCEDURAL TEXTURE GENERATORS (No external assets) ---
+        
+        function createCanvasTexture(color1, color2, type = 'noise') {
+            const size = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = color1;
+            ctx.fillRect(0,0,size,size);
+            
+            if(type === 'noise') {
+                for(let i=0; i<5000; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? color2 : '#000';
+                    ctx.globalAlpha = 0.2;
+                    ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+                }
+            } else if (type === 'tile') {
+                ctx.strokeStyle = color2;
+                ctx.lineWidth = 4;
+                ctx.strokeRect(0,0,size,size);
+                // Grime
+                for(let i=0; i<50; i++) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    const s = Math.random() * 40;
+                    ctx.fillRect(Math.random()*size, Math.random()*size, s, s);
+                }
             }
-        });
-
-        // Apply lighting to main canvas
-        this.ctx.drawImage(this.lightCanvas, 0, 0);
-        this.lightCtx.globalCompositeOperation = 'source-over'; // Reset
-    }
-}
-
-// --- GAME ENTITIES ---
-
-class Player {
-    constructor(x, y) {
-        this.x = x; this.y = y;
-        this.w = 16; this.h = 16;
-        this.hp = 100;
-        this.coherence = 100; // "Sanity"
-        this.ammo = 12;
-        this.magSize = 12;
-        this.speed = 2;
-        this.angle = 0;
-        this.flashlightOn = true;
-        this.reloading = false;
-        this.muzzleFlash = 0;
-    }
-
-    update(input, walls, dt) {
-        // Movement with Wall Collision
-        let dx = 0, dy = 0;
-        if (input.keys['w']) dy -= this.speed;
-        if (input.keys['s']) dy += this.speed;
-        if (input.keys['a']) dx -= this.speed;
-        if (input.keys['d']) dx += this.speed;
-
-        // "Coherence" Input Lag simulation
-        if (this.coherence < 30 && Math.random() > 0.9) {
-            dx *= -1; // Controls invert momentarily
-        }
-
-        if (dx !== 0 || dy !== 0) {
-            if (!this.checkCollision(this.x + dx, this.y, walls)) this.x += dx;
-            if (!this.checkCollision(this.x, this.y + dy, walls)) this.y += dy;
             
-            // Step sound simulation handled in game loop
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter; // PS2 style
+            return tex;
         }
 
-        // Aiming
-        this.angle = Math.atan2(input.mouse.y - this.y, input.mouse.x - this.x);
+        function generateCreepyFace() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Base: Pale distorted skin
+            ctx.fillStyle = '#dcdcdc';
+            ctx.fillRect(0,0,size,size);
+            
+            // Noise overlay
+            for(let i=0; i<20000; i++) {
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
+                ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+            }
 
-        // Flashlight Toggle
-        if (input.keys['f'] && !this.fPressed) {
-            this.flashlightOn = !this.flashlightOn;
-            this.fPressed = true;
-        } else if (!input.keys['f']) {
-            this.fPressed = false;
-        }
-
-        if (this.muzzleFlash > 0) this.muzzleFlash--;
-    }
-
-    checkCollision(x, y, walls) {
-        for (let w of walls) {
-            if (x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h) return true;
-        }
-        return false;
-    }
-
-    draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        
-        // Body (Tactical Vest look)
-        ctx.fillStyle = '#2a3b4c';
-        ctx.fillRect(-8, -8, 16, 16);
-        
-        // Arms/Gun
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 4, 12, 4); // Right arm
-        ctx.fillStyle = '#555';
-        ctx.fillRect(8, 2, 14, 3); // Gun barrel
-
-        // Muzzle Flash
-        if (this.muzzleFlash > 0) {
-            ctx.fillStyle = '#ffaa00';
+            // Distorted Eyes
+            const eyeY = size * 0.4;
+            ctx.fillStyle = '#000';
+            const eyeSize = 40 + Math.random() * 60;
             ctx.beginPath();
-            ctx.arc(22, 3, 5 + Math.random()*5, 0, Math.PI*2);
+            ctx.arc(size*0.3, eyeY + (Math.random()*40-20), eyeSize, 0, Math.PI*2);
+            ctx.arc(size*0.7, eyeY + (Math.random()*40-20), eyeSize * (0.8 + Math.random()), 0, Math.PI*2);
             ctx.fill();
-        }
-
-        ctx.restore();
-    }
-}
-
-class Enemy {
-    constructor(x, y) {
-        this.x = x; this.y = y;
-        this.w = 16; this.h = 16;
-        this.hp = 3;
-        this.speed = 1.2;
-        this.type = 'enemy';
-        this.state = 'IDLE'; // IDLE, CHASE, ATTACK
-        this.detectRange = 150;
-        this.angle = 0;
-    }
-
-    update(player, walls, dt) {
-        const d = MathUtils.dist(this.x, this.y, player.x, player.y);
-        
-        // AI Logic
-        if (d < this.detectRange || this.hp < 3) {
-            this.state = 'CHASE';
-        }
-
-        if (this.state === 'CHASE') {
-            this.angle = Math.atan2(player.y - this.y, player.x - this.x);
-            // Simple pathfinding (move towards player)
-            let dx = Math.cos(this.angle) * this.speed;
-            let dy = Math.sin(this.angle) * this.speed;
             
-            // Jitter movement (creepier)
-            if (Math.random() > 0.9) this.angle += MathUtils.rand(-0.5, 0.5);
+            // Red glowing pupils
+            ctx.fillStyle = '#a00';
+            ctx.beginPath();
+            ctx.arc(size*0.3, eyeY, 5, 0, Math.PI*2);
+            ctx.arc(size*0.7, eyeY, 5, 0, Math.PI*2);
+            ctx.fill();
 
-            this.x += dx;
-            this.y += dy;
-        }
-    }
-
-    draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        
-        // Monster Graphic (Fleshy blob style)
-        ctx.fillStyle = '#8a3324';
-        ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, Math.PI*2);
-        ctx.fill();
-        
-        // Tentacles/Limbs
-        ctx.strokeStyle = '#5a2015';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, 5); ctx.lineTo(10, 10);
-        ctx.moveTo(0, -5); ctx.lineTo(10, -10);
-        ctx.stroke();
-
-        ctx.restore();
-    }
-}
-
-class Projectile {
-    constructor(x, y, angle) {
-        this.x = x; this.y = y;
-        this.vx = Math.cos(angle) * 10;
-        this.vy = Math.sin(angle) * 10;
-        this.active = true;
-    }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-    }
-    draw(ctx) {
-        ctx.fillStyle = '#ffffaa';
-        ctx.fillRect(this.x, this.y, 2, 2);
-    }
-}
-
-// --- MAIN GAME CONTROLLER ---
-const Game = {
-    canvas: document.getElementById('gameCanvas'),
-    ctx: null,
-    width: 640,  // Internal Resolution
-    height: 360, // Internal Resolution
-    
-    player: null,
-    walls: [],
-    enemies: [],
-    projectiles: [],
-    bloodDecals: [],
-    
-    renderer: null,
-    input: null,
-    audio: null,
-    
-    state: 'MENU', // MENU, PLAY, GAMEOVER
-    lastTime: 0,
-    
-    // Logs for narrative
-    logs: [
-        "> SYSTEM: LINK ESTABLISHED...",
-        "> USER: CLEANER_UNIT_4",
-        "> MISSION: PURGE BIOLOGICAL DATA",
-        "> WARNING: REALITY COHERENCE UNSTABLE"
-    ],
-
-    init() {
-        this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
-        
-        this.renderer = new Renderer(this.ctx, this.width, this.height);
-        this.input = new InputHandler();
-        this.audio = new AudioSynth();
-        
-        this.audio.resume();
-        document.getElementById('menu-screen').style.display = 'none';
-        
-        this.reset();
-        this.state = 'PLAY';
-        
-        requestAnimationFrame(t => this.loop(t));
-        this.log("ENTERING FACILITY...");
-    },
-
-    reset() {
-        this.player = new Player(100, 100);
-        this.walls = [
-            {x:0, y:0, w:640, h:20}, {x:0, y:340, w:640, h:20},
-            {x:0, y:0, w:20, h:360}, {x:620, y:0, w:20, h:360},
-            {x:200, y:100, w:20, h:150}, {x:400, y:50, w:150, h:20},
-            {x:400, y:200, w:150, h:20}
-        ];
-        this.enemies = [];
-        // Spawn initial enemy
-        this.enemies.push(new Enemy(500, 300));
-        this.enemies.push(new Enemy(550, 100));
-        this.projectiles = [];
-        this.bloodDecals = [];
-    },
-
-    log(msg) {
-        this.logs.push(`> ${msg}`);
-        if(this.logs.length > 6) this.logs.shift();
-        const logDiv = document.getElementById('log-area');
-        logDiv.innerHTML = this.logs.join('<br>');
-    },
-
-    update(dt) {
-        if(this.state !== 'PLAY') return;
-
-        // Player Logic
-        this.player.update(this.input, this.walls, dt);
-
-        // Shooting
-        if(this.input.mouse.down && this.player.ammo > 0 && !this.player.cooldown) {
-            this.projectiles.push(new Projectile(this.player.x, this.player.y, this.player.angle));
-            this.player.ammo--;
-            this.player.muzzleFlash = 3;
-            this.player.cooldown = 10; // Fire rate
-            this.audio.playShoot();
-            // Recoil
-            this.player.x -= Math.cos(this.player.angle)*2;
-            this.player.y -= Math.sin(this.player.angle)*2;
-        }
-        if(this.player.cooldown > 0) this.player.cooldown--;
-
-        // Projectiles
-        this.projectiles.forEach(p => p.update());
-        // Remove OOB
-        this.projectiles = this.projectiles.filter(p => 
-            p.x > 0 && p.x < this.width && p.y > 0 && p.y < this.height && p.active
-        );
-
-        // Enemies
-        this.enemies.forEach(e => {
-            e.update(this.player, this.walls, dt);
+            // Screaming mouth
+            ctx.fillStyle = '#110000';
+            ctx.beginPath();
+            const mouthW = 100 + Math.random() * 100;
+            const mouthH = 100 + Math.random() * 100;
+            ctx.ellipse(size/2, size*0.75, mouthW, mouthH, 0, 0, Math.PI*2);
+            ctx.fill();
             
-            // Collision with Player
-            if(MathUtils.dist(e.x, e.y, this.player.x, this.player.y) < 16) {
-                this.player.hp -= 1;
-                this.player.coherence -= 0.5;
-                if(Math.random()>0.9) this.audio.playImpact();
+            // Teeth
+            ctx.fillStyle = '#ffeedd';
+            for(let i=0; i<10; i++) {
+                ctx.fillRect(size/2 - mouthW + (i*20), size*0.75 - 50, 10, 40);
             }
 
-            // Hit by bullets
-            this.projectiles.forEach(p => {
-                if(p.active && MathUtils.dist(p.x, p.y, e.x, e.y) < 12) {
-                    e.hp--;
-                    p.active = false;
-                    // Blood Splat
-                    this.bloodDecals.push({
-                        x: e.x + MathUtils.rand(-5,5),
-                        y: e.y + MathUtils.rand(-5,5),
-                        size: MathUtils.rand(2, 6),
-                        alpha: 1
-                    });
-                    this.audio.playImpact();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 3D SETUP ---
+        const container = document.getElementById('game-container');
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth * config.resScale, window.innerHeight * config.resScale, false);
+        renderer.domElement.style.width = "100%";
+        renderer.domElement.style.height = "100%";
+        container.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.15); // Thick darkness
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        
+        // Flashlight
+        const light = new THREE.PointLight(0xffffee, 1.5, 12);
+        camera.add(light);
+        scene.add(camera);
+
+        const controls = new PointerLockControls(camera, document.body);
+
+        // --- MAZE GENERATION (Recursive Backtracker) ---
+        let walls = [];
+        let floorPlan = [];
+        let exitPos = new THREE.Vector3();
+        
+        function generateMaze(size) {
+            // Reset
+            walls.forEach(w => scene.remove(w));
+            walls = [];
+            floorPlan = Array(size).fill().map(() => Array(size).fill(1)); // 1 = Wall, 0 = Path
+
+            const directions = [[0, 2], [2, 0], [0, -2], [-2, 0]];
+            const stack = [[1, 1]];
+            floorPlan[1][1] = 0;
+
+            while (stack.length) {
+                const [cx, cy] = stack[stack.length - 1];
+                const neighbors = [];
+
+                directions.forEach(([dx, dy]) => {
+                    const nx = cx + dx, ny = cy + dy;
+                    if (nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1 && floorPlan[ny][nx] === 1) {
+                        neighbors.push([nx, ny, cx + dx / 2, cy + dy / 2]);
+                    }
+                });
+
+                if (neighbors.length) {
+                    const [nx, ny, mx, my] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    floorPlan[ny][nx] = 0;
+                    floorPlan[my][mx] = 0; // Remove wall between
+                    stack.push([nx, ny]);
+                } else {
+                    stack.pop();
+                }
+            }
+
+            // Textures
+            const wallTex = createCanvasTexture('#333', '#111', 'noise');
+            const floorTex = createCanvasTexture('#222', '#444', 'tile');
+            const matWall = new THREE.MeshLambertMaterial({ map: wallTex });
+            const matFloor = new THREE.MeshLambertMaterial({ map: floorTex });
+
+            // Build Geometry
+            const geoBox = new THREE.BoxGeometry(2, 4, 2);
+            
+            for(let y=0; y<size; y++){
+                for(let x=0; x<size; x++){
+                    if(floorPlan[y][x] === 1) {
+                        const wall = new THREE.Mesh(geoBox, matWall);
+                        wall.position.set(x*2, 2, y*2);
+                        scene.add(wall);
+                        walls.push(wall);
+                    } else {
+                        // Floor
+                        const floor = new THREE.Mesh(new THREE.PlaneGeometry(2,2), matFloor);
+                        floor.rotation.x = -Math.PI/2;
+                        floor.position.set(x*2, 0, y*2);
+                        scene.add(floor);
+                        
+                        // Ceiling
+                        const ceil = floor.clone();
+                        ceil.position.y = 4;
+                        ceil.rotation.x = Math.PI/2;
+                        scene.add(ceil);
+
+                        // Random avant-garde object spawning
+                        if(Math.random() < 0.05 && !(x==1 && y==1)) {
+                            spawnRandomObject(x*2, y*2);
+                        }
+                        
+                        // NPC spawning
+                        if(Math.random() < 0.02 && !(x==1 && y==1)) {
+                            spawnNPC(x*2, y*2);
+                        }
+                    }
+                }
+            }
+
+            // Set Player Start
+            camera.position.set(2, 1.5, 2);
+            
+            // Set Exit (farthest point approx)
+            exitPos.set((size-2)*2, 1, (size-2)*2);
+            const exitGeo = new THREE.BoxGeometry(1, 1, 1);
+            const exitMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+            const exitBox = new THREE.Mesh(exitGeo, exitMat);
+            exitBox.position.copy(exitPos);
+            scene.add(exitBox);
+            walls.push(exitBox); // Treat as collidable but handled separately
+        }
+
+        // --- AVANT-GARDE OBJECTS ---
+        function spawnRandomObject(x, z) {
+            const types = ['cube', 'pyramid', 'eye'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            let mesh;
+            
+            if(type === 'cube') {
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshNormalMaterial());
+            } else if (type === 'pyramid') {
+                mesh = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1, 4), new THREE.MeshBasicMaterial({color: 0xff0000, wireframe: true}));
+            } else {
+                // Eye
+                mesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({color: 0xffffff}));
+                const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({color: 0x000000}));
+                pupil.position.z = 0.25;
+                mesh.add(pupil);
+            }
+            
+            mesh.position.set(x, 1.5 + Math.random(), z);
+            scene.add(mesh);
+            
+            // Floating animation stored in userData
+            mesh.userData = { 
+                floatOffset: Math.random() * 10, 
+                rotSpeed: Math.random() * 0.05 
+            };
+            walls.push(mesh); // Add to dynamic objects list for animation loop
+        }
+
+        // --- NPC SYSTEM ---
+        const npcs = [];
+        const questions = [
+            { q: "DOES THE STATIC HURT?", a: [{t:"YES", e:"hp-"}, {t:"NO", e:"san-"}, {t:"I AM THE STATIC", e:"san+"}] },
+            { q: "IS YOUR FACE YOUR OWN?", a: [{t:"YES", e:"sanity-"}, {t:"TOUCH FACE", e:"hp+"}] },
+            { q: "THE WALLS ARE BREATHING.", a: [{t:"LET THEM", e:"san+"}, {t:"STOP THEM", e:"hp-"}] },
+            { q: "WHERE IS THE EXIT?", a: [{t:"THERE IS NONE", e:"san-"}, {t:"FORWARD", e:"heal"}] }
+        ];
+
+        function spawnNPC(x, z) {
+            // NPC is a 2D Sprite looking like a shadow person
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(64, 40, 30, 0, Math.PI*2); // Head
+            ctx.fillRect(20, 70, 88, 180); // Body
+            ctx.fill();
+            
+            // White static eyes
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(40, 30, 10, 10);
+            ctx.fillRect(80, 30, 10, 10);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({ map: tex });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(1, 2, 1);
+            sprite.position.set(x, 1, z);
+            scene.add(sprite);
+            
+            npcs.push({ sprite: sprite, data: questions[Math.floor(Math.random()*questions.length)], active: true });
+        }
+
+        // --- THE ENTITY ---
+        let entity;
+        function spawnEntity() {
+            if(entity) scene.remove(entity);
+            const mat = new THREE.SpriteMaterial({ 
+                map: generateCreepyFace(), 
+                color: 0xffffff,
+                transparent: true
+            });
+            entity = new THREE.Sprite(mat);
+            entity.scale.set(1.5, 1.5, 1.5);
+            // Spawn far away
+            entity.position.set((config.mazeSize-2)*2, 1.5, (config.mazeSize-2)*2); 
+            scene.add(entity);
+        }
+
+        // --- GAME LOGIC ---
+
+        function updateHUD() {
+            document.getElementById('hp-fill').style.width = `${state.hp}%`;
+            document.getElementById('san-fill').style.width = `${state.sanity}%`;
+            
+            // Visual Distortion based on Sanity
+            const distortion = (100 - state.sanity) / 100;
+            document.querySelector('canvas').style.filter = 
+                `contrast(${1 + distortion}) sepia(${0.2 + distortion}) hue-rotate(${distortion * 90}deg)`;
+            
+            // Audio distortion
+            if(lfo) lfo.frequency.value = 0.1 + (distortion * 5);
+        }
+
+        function handleDialog(npc) {
+            if(state.isDialog) return;
+            state.isDialog = true;
+            controls.unlock();
+            
+            const box = document.getElementById('dialog-box');
+            const txt = document.getElementById('npc-text');
+            const choices = document.getElementById('npc-choices');
+            
+            box.style.display = 'block';
+            txt.innerText = npc.data.q;
+            choices.innerHTML = '';
+            
+            npc.data.a.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = opt.t;
+                btn.onclick = () => {
+                    // Apply effects
+                    if(opt.e.includes('hp-')) state.hp -= 20;
+                    if(opt.e.includes('hp+')) state.hp = Math.min(100, state.hp + 20);
+                    if(opt.e.includes('san-')) state.sanity -= 20;
+                    if(opt.e.includes('san+')) state.sanity = Math.min(100, state.sanity + 20);
+                    
+                    npc.active = false; // Disable NPC
+                    npc.sprite.material.color.setHex(0x555555); // Grey out
+                    
+                    closeDialog();
+                };
+                choices.appendChild(btn);
+            });
+        }
+
+        function closeDialog() {
+            document.getElementById('dialog-box').style.display = 'none';
+            state.isDialog = false;
+            controls.lock();
+        }
+
+        function gameOver(reason) {
+            state.isPlaying = false;
+            controls.unlock();
+            const screen = document.getElementById('overlay-screen');
+            screen.style.display = 'flex';
+            screen.querySelector('h1').innerText = reason === 'win' ? "ASCENSION" : "TERMINATED";
+            screen.querySelector('p').innerText = reason === 'win' ? 
+                "YOU FOUND THE EXIT. BUT THE ARCHIVE REMAINS." : 
+                "YOUR DATA HAS BEEN ASSIMILATED.";
+            document.getElementById('start-btn').innerText = "REBOOT SYSTEM";
+            
+            if(droneOsc) {
+                droneOsc.stop();
+                noiseNode.stop();
+            }
+        }
+
+        function startGame() {
+            state = { hp: 100, sanity: 100, isPlaying: true, isDialog: false, level: state.level + 1 };
+            document.getElementById('overlay-screen').style.display = 'none';
+            
+            generateMaze(config.mazeSize);
+            spawnEntity();
+            initAudio();
+            
+            controls.lock();
+        }
+
+        // --- MAIN LOOP ---
+        const clock = new THREE.Clock();
+        const playerVel = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!state.isPlaying || state.isDialog) return;
+
+            const delta = clock.getDelta();
+            
+            // 1. Player Movement
+            playerVel.x -= playerVel.x * 10.0 * delta;
+            playerVel.z -= playerVel.z * 10.0 * delta;
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) playerVel.z -= direction.z * 40.0 * delta;
+            if (moveLeft || moveRight) playerVel.x -= direction.x * 40.0 * delta;
+
+            controls.moveRight(-playerVel.x * delta * config.speed);
+            controls.moveForward(-playerVel.z * delta * config.speed);
+
+            // 2. Collision Detection (Simple Box Check)
+            const pPos = camera.position;
+            // Floor check
+            const cx = Math.round(pPos.x / 2);
+            const cy = Math.round(pPos.z / 2);
+            
+            // Check boundaries vs Maze Array
+            if(cx >= 0 && cx < config.mazeSize && cy >= 0 && cy < config.mazeSize) {
+                if(floorPlan[cy][cx] === 1) {
+                    // Collision: Push back
+                    controls.moveRight(playerVel.x * delta * config.speed);
+                    controls.moveForward(playerVel.z * delta * config.speed);
+                }
+            }
+
+            // 3. Entity Logic
+            if(entity) {
+                const dist = pPos.distanceTo(entity.position);
+                
+                // Move towards player
+                const dirToPlayer = new THREE.Vector3().subVectors(pPos, entity.position).normalize();
+                entity.position.add(dirToPlayer.multiplyScalar(config.entitySpeed * delta));
+                
+                // Constant look at
+                entity.lookAt(pPos);
+
+                // Sanity drain proximity
+                if(dist < 8) {
+                    state.sanity -= delta * 5;
+                    // Audio flicker volume
+                    gainNode.gain.value = 0.15 + (Math.random() * 0.5);
+                } else {
+                    gainNode.gain.value = 0.15;
+                }
+
+                // Jumpscare / Death
+                if(dist < 1.2) {
+                    gameOver('dead');
+                }
+            }
+
+            // 4. Avant-Garde Objects Animation
+            scene.children.forEach(child => {
+                if(child.userData.floatOffset) {
+                    child.rotation.x += child.userData.rotSpeed;
+                    child.rotation.y += child.userData.rotSpeed;
+                    child.position.y = 1.5 + Math.sin(clock.elapsedTime + child.userData.floatOffset) * 0.5;
                 }
             });
-        });
 
-        // Kill dead enemies
-        const deadEnemies = this.enemies.filter(e => e.hp <= 0);
-        if (deadEnemies.length > 0) {
-            deadEnemies.forEach(e => {
-                this.log("SUBJECT TERMINATED.");
-                this.audio.playScream();
-                // Spawn new ones to keep tension
-                setTimeout(() => {
-                    this.enemies.push(new Enemy(MathUtils.rand(50, 600), MathUtils.rand(50, 300)));
-                }, 2000);
+            // 5. NPC Interaction
+            npcs.forEach(npc => {
+                if(npc.active && pPos.distanceTo(npc.sprite.position) < 2.5) {
+                    handleDialog(npc);
+                }
             });
-        }
-        this.enemies = this.enemies.filter(e => e.hp > 0);
 
-        // Coherence Glitches
-        if (this.player.coherence < 50) {
-            document.getElementById('glitch-overlay').style.display = (Math.random() > 0.95) ? 'block' : 'none';
-        } else {
-            document.getElementById('glitch-overlay').style.display = 'none';
+            // 6. Win Condition
+            if(pPos.distanceTo(exitPos) < 2) {
+                gameOver('win');
+            }
+
+            // 7. Stats Check
+            if(state.hp <= 0 || state.sanity <= 0) gameOver('dead');
+
+            updateHUD();
+            renderer.render(scene, camera);
         }
 
-        // Win/Loss
-        if (this.player.hp <= 0) {
-            this.log("CRITICAL FAILURE. SIGNAL LOST.");
-            this.state = 'GAMEOVER';
-        }
-    },
+        // --- INPUT HANDLING ---
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 
-    draw() {
-        this.renderer.clear();
-        this.renderer.drawBlood(this.bloodDecals);
-        this.renderer.drawMap(this.walls);
-        this.renderer.drawEntities([...this.enemies, ...this.projectiles], this.player);
-        this.renderer.drawLighting(this.player, this.enemies);
+        const onKeyDown = function (event) {
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                case 'ArrowRight': case 'KeyD': moveRight = true; break;
+            }
+        };
+
+        const onKeyUp = function (event) {
+            switch (event.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                case 'ArrowRight': case 'KeyD': moveRight = false; break;
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
         
-        // Update HTML UI
-        document.getElementById('hp-bar').style.width = this.player.hp + '%';
-        document.getElementById('coherence-bar').style.width = this.player.coherence + '%';
-        document.getElementById('ammo-counter').innerText = `AMMO: ${this.player.ammo}/${this.player.magSize}`;
+        document.getElementById('start-btn').addEventListener('click', startGame);
         
-        if(this.player.hp < 30) {
-            document.getElementById('hp-bar').classList.add('critical');
-        }
-        
-        // Dynamic Threat Indicator
-        let threat = false;
-        this.enemies.forEach(e => {
-            if(MathUtils.dist(this.player.x, this.player.y, e.x, e.y) < 100) threat = true;
+        // Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth * config.resScale, window.innerHeight * config.resScale, false);
         });
-        document.getElementById('threat-level').style.opacity = threat ? 1 : 0;
-    },
 
-    loop(timestamp) {
-        const dt = timestamp - this.lastTime;
-        this.lastTime = timestamp;
+        animate();
 
-        this.update(dt);
-        this.draw();
-
-        requestAnimationFrame(t => this.loop(t));
-    }
-};
-
-</script>
+    </script>
 </body>
 </html>
