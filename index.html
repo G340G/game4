@@ -2,85 +2,155 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>GLITCH CITY: SECTOR 0 — PS2 DRIFT</title>
-
-  <!-- Prevent favicon 404 -->
-  <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=" />
-
-  <link rel="stylesheet" href="./style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>GLITCH CITY: POCKET CORRIDORS</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <style>
+    html,body{ margin:0; width:100%; height:100%; overflow:hidden; background:#000; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;}
+    canvas{ display:block; width:100%; height:100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+    #ui { position:fixed; inset:0; pointer-events:none; color:#fff; z-index:10; }
+    #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:20; pointer-events:auto; }
+    .panel { width:min(820px,92vw); border:1px solid rgba(255,255,255,.2); background:linear-gradient(180deg, rgba(20,20,20,.96), rgba(5,5,5,.98)); box-shadow:0 0 60px rgba(0,0,0,.9); border-radius:18px; padding:22px; }
+    .title { letter-spacing:.12em; font-size:44px; color:#ff2c2c; margin:0 0 8px 0; text-shadow:0 0 18px rgba(255,44,44,.35); }
+    .sub { color:rgba(255,255,255,.75); margin:0 0 18px 0; line-height:1.4; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    input,button,select {
+      pointer-events:auto;
+      font:inherit;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(10,10,10,.9);
+      color:#fff;
+      padding:12px 14px;
+      outline:none;
+    }
+    input{ flex:1; min-width:220px; }
+    button{ cursor:pointer; background:linear-gradient(180deg, rgba(220,0,0,.95), rgba(120,0,0,.95)); border:1px solid rgba(255,80,80,.3); }
+    button:hover{ filter:brightness(1.08); box-shadow:0 0 22px rgba(255,0,0,.24); }
+    .hint { font-size:14px; opacity:.72; margin-top:10px; line-height:1.5; }
+    #hud { position:absolute; left:16px; bottom:16px; width:320px; }
+    .barWrap{ width:280px; height:14px; border:1px solid rgba(255,255,255,.55); background:rgba(0,0,0,.6); border-radius:999px; overflow:hidden; }
+    .bar{ height:100%; width:100%; }
+    #hpBar{ background:linear-gradient(90deg, #e11, #900); }
+    #sanBar{ background:linear-gradient(90deg, #2af, #117); }
+    #objective{ margin-top:10px; font-size:14px; color:rgba(255,255,255,.7); }
+    #crosshair{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:14px; height:14px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.75);
+      box-shadow:0 0 10px rgba(255,255,255,.08);
+    }
+    #crosshair.active{ border-color:#3f3; box-shadow:0 0 16px rgba(60,255,60,.25); }
+    #interact{ position:absolute; left:50%; top:62%; transform:translateX(-50%); font-size:18px; color:#ff0; text-shadow:0 2px 0 #000; display:none; }
+    #minimapWrap{ position:absolute; right:14px; top:14px; width:160px; height:160px; border-radius:50%; border:2px solid rgba(255,255,255,.7); overflow:hidden; background:rgba(0,0,0,.5); }
+    #minimap{ width:100%; height:100%; display:block; }
+    #noteOverlay{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:30;
+      background:rgba(0,0,0,.76); pointer-events:auto;
+    }
+    #noteCard{
+      width:min(560px,92vw);
+      background:#f2f2f2;
+      color:#111;
+      border:12px solid #222;
+      border-radius:18px;
+      padding:18px;
+      font-family: "Times New Roman", Times, serif;
+      box-shadow:0 0 80px rgba(0,0,0,.9);
+    }
+    #noteTitle{ margin:0 0 8px 0; }
+    #noteText{ margin:0; line-height:1.5; }
+    #death{
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:40;
+      background:rgba(0,0,0,.95); pointer-events:auto;
+    }
+    .glitch { animation: glitch .25s infinite; display:inline-block; }
+    @keyframes glitch{
+      0%{ transform:translate(0,0); filter:none; }
+      20%{ transform:translate(-2px,1px); filter:hue-rotate(20deg); }
+      40%{ transform:translate(2px,-1px); filter:hue-rotate(-30deg); }
+      60%{ transform:translate(-1px,-2px); filter:contrast(1.1); }
+      80%{ transform:translate(1px,2px); filter:hue-rotate(50deg); }
+      100%{ transform:translate(0,0); filter:none; }
+    }
+  </style>
 
   <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
     }
-  }
   </script>
 </head>
+
 <body>
-  <div id="ui">
-    <div id="crt"></div>
+  <div id="start">
+    <div class="panel">
+      <h1 class="title"><span class="glitch">GLITCH CITY</span> // POCKET CORRIDORS</h1>
+      <p class="sub">
+        It starts bright. It ends wrong. The city learns your name.
+        Find keys. Open doors. Don’t stare at the wall images for too long.
+      </p>
 
-    <div id="crosshair"></div>
-
-    <div id="minimap-wrap">
-      <canvas id="minimap" width="160" height="160"></canvas>
-      <div id="minimap-label">MAP / MEMORY</div>
-    </div>
-
-    <div id="hud">
-      <div class="hudrow">
-        <div class="hudlabel">DATA INTEGRITY</div>
-        <div class="bar"><div id="hpFill" class="fill"></div></div>
-      </div>
-      <div class="hudrow">
-        <div class="hudlabel">LOGIC STABILITY</div>
-        <div class="bar"><div id="sanFill" class="fill"></div></div>
-      </div>
-      <div id="objective">OBJECTIVE: FIND THE SERVER ROOM KEY</div>
-      <div id="pickup"> </div>
-    </div>
-
-    <div id="interactHint">PRESS [E]</div>
-
-    <div id="note" class="panel">
-      <div class="panelTitle" id="noteTitle">NOTE</div>
-      <div class="panelBody" id="noteBody">...</div>
-      <button id="noteClose">PUT AWAY</button>
-    </div>
-
-    <div id="start" class="screen">
-      <div class="title glitch">GLITCH CITY</div>
-      <div class="subtitle">SECTOR 7 IS CORRUPTED. IT RAINS MEMORY.</div>
-
-      <div class="form">
-        <label>ENTER YOUR NAME</label>
-        <input id="playerName" maxlength="18" placeholder="e.g. DEFER" />
-        <div class="tips">
-          WASD Move · SHIFT Run · SPACE Jump · E Interact · LMB Attack · Q Drop · F Toggle Flashlight
-        </div>
+      <div class="row">
+        <input id="nameInput" maxlength="18" placeholder="Choose your name (appears in-world)…" />
+        <select id="difficulty">
+          <option value="0">NORMAL</option>
+          <option value="1">HARD (more enemies)</option>
+          <option value="2">VOID (max glitches)</option>
+        </select>
+        <button id="startBtn">ENTER SIMULATION</button>
       </div>
 
-      <button id="startBtn">ENTER SIMULATION</button>
-      <div class="small">
-        TIP: low sanity makes the map lie.
+      <div class="hint">
+        Controls: WASD move • SHIFT run • SPACE jump • E interact • F flashlight • Q use item • ESC unlock mouse<br/>
+        Tip: reading “creepy” notes reduces SANITY faster. Low sanity darkens the world and the minimap lies.
       </div>
-    </div>
-
-    <div id="death" class="screen hidden">
-      <div class="title" style="color:#ff2a2a;">CONNECTION LOST</div>
-      <div class="subtitle" id="deathReason"></div>
-      <button id="respawnBtn">RESPAWN</button>
     </div>
   </div>
 
-  <div id="mount"></div>
-  <script type="module" src="./main.js"></script>
+  <div id="ui">
+    <div id="crosshair"></div>
+    <div id="interact">[E] …</div>
+
+    <div id="minimapWrap"><canvas id="minimap" width="256" height="256"></canvas></div>
+
+    <div id="hud">
+      <div style="font-size:12px; opacity:.8;">DATA INTEGRITY (HP)</div>
+      <div class="barWrap"><div id="hpBar" class="bar"></div></div>
+
+      <div style="height:8px"></div>
+
+      <div style="font-size:12px; opacity:.8;">LOGIC STABILITY (SANITY)</div>
+      <div class="barWrap"><div id="sanBar" class="bar"></div></div>
+
+      <div id="objective">OBJECTIVE: FIND A KEY. OPEN A DOOR. ENTER A POCKET CORRIDOR.</div>
+    </div>
+  </div>
+
+  <div id="noteOverlay">
+    <div id="noteCard">
+      <h2 id="noteTitle">NOTE</h2>
+      <p id="noteText">…</p>
+      <div class="row" style="margin-top:12px; justify-content:flex-end;">
+        <button id="noteClose">PUT AWAY</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="death">
+    <div class="panel" style="text-align:center;">
+      <h1 style="color:#ff2c2c; margin:0 0 8px 0;">CONNECTION LOST</h1>
+      <p id="deathReason" style="color:rgba(255,255,255,.75); margin:0 0 12px 0;">…</p>
+      <button onclick="location.reload()">RESPAWN</button>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
-
 
 
 
