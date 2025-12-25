@@ -2,76 +2,169 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>GLITCH CITY: POCKET CORRIDORS</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GLITCH CITY: SECTOR 0 — POCKET CORRIDORS</title>
+
+  <!-- Prevent favicon 404 -->
+  <link rel="icon" href="data:," />
+
   <style>
-    html,body{ margin:0; width:100%; height:100%; overflow:hidden; background:#000; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;}
-    canvas{ display:block; width:100%; height:100%; image-rendering: pixelated; image-rendering: crisp-edges; }
-    #ui { position:fixed; inset:0; pointer-events:none; color:#fff; z-index:10; }
-    #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.92); z-index:20; pointer-events:auto; }
-    .panel { width:min(820px,92vw); border:1px solid rgba(255,255,255,.2); background:linear-gradient(180deg, rgba(20,20,20,.96), rgba(5,5,5,.98)); box-shadow:0 0 60px rgba(0,0,0,.9); border-radius:18px; padding:22px; }
-    .title { letter-spacing:.12em; font-size:44px; color:#ff2c2c; margin:0 0 8px 0; text-shadow:0 0 18px rgba(255,44,44,.35); }
-    .sub { color:rgba(255,255,255,.75); margin:0 0 18px 0; line-height:1.4; }
-    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-    input,button,select {
+    :root{
+      --ui:#e8e8e8;
+      --ui2:#a8a8a8;
+      --warn:#ff3b3b;
+      --ok:#4dff7a;
+      --ink:#050507;
+      --panel:rgba(0,0,0,.72);
+      --panel2:rgba(10,10,14,.78);
+      --shadow:0 10px 45px rgba(0,0,0,.6);
+    }
+    html,body{height:100%; margin:0; background:#000; overflow:hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;}
+    canvas{display:block;}
+
+    #ui-layer{position:absolute; inset:0; pointer-events:none; z-index:10;}
+
+    /* PS2-ish HUD */
+    #crosshair{
+      position:absolute; left:50%; top:50%;
+      width:12px; height:12px;
+      border:2px solid rgba(255,255,255,.85);
+      border-radius:50%;
+      transform:translate(-50%,-50%);
+      box-shadow:0 0 14px rgba(255,255,255,.08);
+      transition:transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    #crosshair.interact{
+      border-color:var(--ok);
+      background:rgba(77,255,122,.22);
+      transform:translate(-50%,-50%) scale(1.25);
+    }
+
+    #stats{
+      position:absolute; left:18px; bottom:18px;
+      padding:12px 14px;
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.22);
+      border-radius:10px;
+      box-shadow:var(--shadow);
+      min-width:260px;
+      color:var(--ui);
+      pointer-events:none;
+      backdrop-filter: blur(6px);
+    }
+    .label{font-size:12px; letter-spacing:.12em; color:var(--ui2);}
+    .bar{height:12px; width:260px; border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.06); border-radius:8px; overflow:hidden; margin:6px 0 10px;}
+    .fill{height:100%; width:100%; transition:width .12s linear;}
+    #hp{background:linear-gradient(90deg,#ff3b3b,#ff7b7b);}
+    #san{background:linear-gradient(90deg,#3b6cff,#7bc0ff);}
+    #ammo{background:linear-gradient(90deg,#f3ff3b,#ffe37b);}
+    #quest{
+      margin-top:8px; font-size:12px; color:#b7b7b7;
+      border-top:1px solid rgba(255,255,255,.15);
+      padding-top:8px;
+      line-height:1.25;
+    }
+    #interaction{
+      position:absolute; left:50%; top:60%;
+      transform:translateX(-50%);
+      padding:10px 12px;
+      background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:10px;
+      color:#ffe86a;
+      text-shadow:0 2px 0 rgba(0,0,0,.85);
+      font-weight:700;
+      letter-spacing:.05em;
+      display:none;
+    }
+
+    #minimap-wrap{
+      position:absolute; right:18px; top:18px;
+      width:168px; height:168px;
+      background:var(--panel2);
+      border:1px solid rgba(255,255,255,.25);
+      border-radius:999px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    #minimap{width:100%; height:100%; opacity:.9; display:block;}
+
+    /* Overlays */
+    #start, #death, #note, #pause{
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.86);
+      z-index:20;
       pointer-events:auto;
-      font:inherit;
+    }
+    .panel{
+      width:min(720px, 92vw);
+      background:rgba(10,10,14,.86);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:16px;
+      box-shadow:0 20px 80px rgba(0,0,0,.75);
+      padding:18px 18px 16px;
+      color:var(--ui);
+      backdrop-filter: blur(10px);
+    }
+    .title{
+      font-size:40px;
+      letter-spacing:.08em;
+      margin:0 0 8px;
+      color:#ff3b3b;
+      text-shadow:0 0 22px rgba(255,0,0,.2);
+    }
+    .sub{color:#c9c9c9; margin:0 0 14px; line-height:1.35}
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+    .row > *{flex:1;}
+    input[type="text"]{
+      pointer-events:auto;
+      width:100%;
+      padding:12px 12px;
       border-radius:12px;
       border:1px solid rgba(255,255,255,.18);
-      background:rgba(10,10,10,.9);
+      background:rgba(0,0,0,.35);
       color:#fff;
-      padding:12px 14px;
       outline:none;
+      font-size:14px;
     }
-    input{ flex:1; min-width:220px; }
-    button{ cursor:pointer; background:linear-gradient(180deg, rgba(220,0,0,.95), rgba(120,0,0,.95)); border:1px solid rgba(255,80,80,.3); }
-    button:hover{ filter:brightness(1.08); box-shadow:0 0 22px rgba(255,0,0,.24); }
-    .hint { font-size:14px; opacity:.72; margin-top:10px; line-height:1.5; }
-    #hud { position:absolute; left:16px; bottom:16px; width:320px; }
-    .barWrap{ width:280px; height:14px; border:1px solid rgba(255,255,255,.55); background:rgba(0,0,0,.6); border-radius:999px; overflow:hidden; }
-    .bar{ height:100%; width:100%; }
-    #hpBar{ background:linear-gradient(90deg, #e11, #900); }
-    #sanBar{ background:linear-gradient(90deg, #2af, #117); }
-    #objective{ margin-top:10px; font-size:14px; color:rgba(255,255,255,.7); }
-    #crosshair{
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:14px; height:14px; border-radius:50%;
-      border:2px solid rgba(255,255,255,.75);
-      box-shadow:0 0 10px rgba(255,255,255,.08);
+    .btn{
+      pointer-events:auto;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.18);
+      background:linear-gradient(180deg, rgba(255,70,70,.92), rgba(170,0,0,.92));
+      color:white;
+      font-weight:800;
+      letter-spacing:.08em;
+      cursor:pointer;
+      user-select:none;
+      text-transform:uppercase;
     }
-    #crosshair.active{ border-color:#3f3; box-shadow:0 0 16px rgba(60,255,60,.25); }
-    #interact{ position:absolute; left:50%; top:62%; transform:translateX(-50%); font-size:18px; color:#ff0; text-shadow:0 2px 0 #000; display:none; }
-    #minimapWrap{ position:absolute; right:14px; top:14px; width:160px; height:160px; border-radius:50%; border:2px solid rgba(255,255,255,.7); overflow:hidden; background:rgba(0,0,0,.5); }
-    #minimap{ width:100%; height:100%; display:block; }
-    #noteOverlay{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:30;
-      background:rgba(0,0,0,.76); pointer-events:auto;
+    .btn:hover{filter:brightness(1.08); box-shadow:0 0 22px rgba(255,0,0,.25);}
+    .btn2{
+      background:rgba(255,255,255,.08);
     }
-    #noteCard{
-      width:min(560px,92vw);
-      background:#f2f2f2;
-      color:#111;
-      border:12px solid #222;
-      border-radius:18px;
-      padding:18px;
-      font-family: "Times New Roman", Times, serif;
-      box-shadow:0 0 80px rgba(0,0,0,.9);
+    .btn2:hover{filter:brightness(1.12); box-shadow:0 0 22px rgba(255,255,255,.08);}
+    .hint{font-size:12px; color:#bdbdbd; opacity:.9; margin-top:10px; line-height:1.35;}
+    .k{display:inline-block; padding:2px 8px; border-radius:8px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06);}
+
+    #note{display:none;}
+    #note .panel{max-width:560px; text-align:left;}
+    #note h2{margin:0 0 8px; color:#fff;}
+    #note p{margin:0 0 14px; color:#e5e5e5; line-height:1.45; white-space:pre-wrap;}
+    #death{display:none;}
+    #pause{display:none;}
+
+    /* tiny glitch animation */
+    .glitch{
+      animation: g .18s infinite;
     }
-    #noteTitle{ margin:0 0 8px 0; }
-    #noteText{ margin:0; line-height:1.5; }
-    #death{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:40;
-      background:rgba(0,0,0,.95); pointer-events:auto;
-    }
-    .glitch { animation: glitch .25s infinite; display:inline-block; }
-    @keyframes glitch{
-      0%{ transform:translate(0,0); filter:none; }
-      20%{ transform:translate(-2px,1px); filter:hue-rotate(20deg); }
-      40%{ transform:translate(2px,-1px); filter:hue-rotate(-30deg); }
-      60%{ transform:translate(-1px,-2px); filter:contrast(1.1); }
-      80%{ transform:translate(1px,2px); filter:hue-rotate(50deg); }
-      100%{ transform:translate(0,0); filter:none; }
+    @keyframes g{
+      0%{transform:translate(0,0);}
+      33%{transform:translate(-1px,1px);}
+      66%{transform:translate(1px,-1px);}
+      100%{transform:translate(0,0);}
     }
   </style>
 
@@ -86,71 +179,91 @@
 </head>
 
 <body>
+  <div id="ui-layer">
+    <div id="crosshair"></div>
+
+    <div id="minimap-wrap"><canvas id="minimap" width="168" height="168"></canvas></div>
+
+    <div id="stats">
+      <div class="label">DATA INTEGRITY</div>
+      <div class="bar"><div id="hp" class="fill"></div></div>
+
+      <div class="label">LOGIC STABILITY</div>
+      <div class="bar"><div id="san" class="fill"></div></div>
+
+      <div class="label">AMMO / CHARGE</div>
+      <div class="bar"><div id="ammo" class="fill"></div></div>
+
+      <div id="quest">OBJECTIVE: FIND A KEY • ENTER A POCKET CORRIDOR • REACH THE EXIT</div>
+    </div>
+
+    <div id="interaction">[E] INTERACT</div>
+  </div>
+
+  <!-- START -->
   <div id="start">
     <div class="panel">
-      <h1 class="title"><span class="glitch">GLITCH CITY</span> // POCKET CORRIDORS</h1>
-      <p class="sub">
-        It starts bright. It ends wrong. The city learns your name.
-        Find keys. Open doors. Don’t stare at the wall images for too long.
-      </p>
+      <h1 class="title glitch">GLITCH CITY</h1>
+      <p class="sub">SECTOR 0 is **too bright** at first. It will dim as your mind learns the map is lying.</p>
 
       <div class="row">
-        <input id="nameInput" maxlength="18" placeholder="Choose your name (appears in-world)…" />
-        <select id="difficulty">
-          <option value="0">NORMAL</option>
-          <option value="1">HARD (more enemies)</option>
-          <option value="2">VOID (max glitches)</option>
-        </select>
-        <button id="startBtn">ENTER SIMULATION</button>
+        <div>
+          <div class="label">PLAYER NAME (will appear on walls/TV)</div>
+          <input id="nameInput" type="text" maxlength="18" placeholder="Type your name… (e.g., DEFER)" value="DEFER" />
+        </div>
+        <div style="flex:0 0 220px;">
+          <div class="label">SIMULATION</div>
+          <button id="startBtn" class="btn">ENTER</button>
+          <button id="howBtn" class="btn btn2" style="margin-top:10px; width:100%;">CONTROLS</button>
+        </div>
       </div>
 
       <div class="hint">
-        Controls: WASD move • SHIFT run • SPACE jump • E interact • F flashlight • Q use item • ESC unlock mouse<br/>
-        Tip: reading “creepy” notes reduces SANITY faster. Low sanity darkens the world and the minimap lies.
+        <div><span class="k">WASD</span> move • <span class="k">SHIFT</span> run • <span class="k">SPACE</span> jump • <span class="k">E</span> interact • <span class="k">Q</span> quick-use • <span class="k">1/2</span> weapon • <span class="k">ESC</span> pause</div>
+        <div style="margin-top:8px;">Sanity drops over time, from reading notes, and from looking at wall images. Lower sanity = darker world + minimap lies + glitches.</div>
       </div>
     </div>
   </div>
 
-  <div id="ui">
-    <div id="crosshair"></div>
-    <div id="interact">[E] …</div>
-
-    <div id="minimapWrap"><canvas id="minimap" width="256" height="256"></canvas></div>
-
-    <div id="hud">
-      <div style="font-size:12px; opacity:.8;">DATA INTEGRITY (HP)</div>
-      <div class="barWrap"><div id="hpBar" class="bar"></div></div>
-
-      <div style="height:8px"></div>
-
-      <div style="font-size:12px; opacity:.8;">LOGIC STABILITY (SANITY)</div>
-      <div class="barWrap"><div id="sanBar" class="bar"></div></div>
-
-      <div id="objective">OBJECTIVE: FIND A KEY. OPEN A DOOR. ENTER A POCKET CORRIDOR.</div>
-    </div>
-  </div>
-
-  <div id="noteOverlay">
-    <div id="noteCard">
+  <!-- NOTE -->
+  <div id="note">
+    <div class="panel">
       <h2 id="noteTitle">NOTE</h2>
-      <p id="noteText">…</p>
-      <div class="row" style="margin-top:12px; justify-content:flex-end;">
-        <button id="noteClose">PUT AWAY</button>
+      <p id="noteBody">...</p>
+      <div class="row" style="margin-top:10px;">
+        <button id="noteClose" class="btn">PUT AWAY</button>
       </div>
     </div>
   </div>
 
-  <div id="death">
-    <div class="panel" style="text-align:center;">
-      <h1 style="color:#ff2c2c; margin:0 0 8px 0;">CONNECTION LOST</h1>
-      <p id="deathReason" style="color:rgba(255,255,255,.75); margin:0 0 12px 0;">…</p>
-      <button onclick="location.reload()">RESPAWN</button>
+  <!-- PAUSE -->
+  <div id="pause">
+    <div class="panel">
+      <h2 style="margin:0 0 6px;">PAUSED</h2>
+      <p class="sub">The simulation keeps breathing even when you don’t.</p>
+      <div class="row">
+        <button id="resumeBtn" class="btn">RESUME</button>
+        <button id="restartBtn" class="btn btn2">RESTART</button>
+      </div>
+      <div class="hint">Tip: low sanity causes the minimap to hallucinate corridors and enemies.</div>
     </div>
   </div>
 
-  <script type="module" src="./js/main.js"></script>
+  <!-- DEATH -->
+  <div id="death">
+    <div class="panel">
+      <h2 style="margin:0; color:#ff3b3b;">CONNECTION LOST</h2>
+      <p id="deathReason" class="sub">…</p>
+      <div class="row">
+        <button id="respawnBtn" class="btn">RESPAWN</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
+
 
 
 
