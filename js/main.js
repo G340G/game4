@@ -629,3 +629,4 @@ class Assets {
 
   requestAnimationFrame(frame);
 })();
+
