@@ -1,208 +1,188 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>GLITCH CITY: SECTOR 0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GLITCH CITY: SECTOR 0 — MEMORY LEAK</title>
 
-  <!-- Fix favicon.ico 404 by using an empty data URI -->
-  <link rel="icon" href="data:," />
+  <!-- Fix favicon.ico 404 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23000'/%3E%3Cpath d='M10 40 L32 10 L54 40 Z' fill='%23f00'/%3E%3C/svg%3E">
 
   <style>
-    :root{
-      --ui:#e8e8e8;
-      --dim:#9aa0a6;
-      --warn:#ffe66d;
-      --bad:#ff3b3b;
-      --good:#43ff7a;
-    }
-    body{ margin:0; overflow:hidden; background:#000; font-family: "Courier New", monospace; }
-    canvas{ display:block; }
+    body { margin:0; overflow:hidden; background:#000; font-family: "Courier New", monospace; }
+    canvas { image-rendering: pixelated; }
 
-    /* UI LAYER */
-    #ui-layer{ position:fixed; inset:0; pointer-events:none; z-index:10; }
-
-    /* Crosshair */
+    /* UI */
+    #ui-layer { position:absolute; inset:0; pointer-events:none; z-index:10; }
     #crosshair{
       position:absolute; top:50%; left:50%;
-      width:12px; height:12px;
-      border:2px solid rgba(255,255,255,0.8);
-      border-radius:50%;
-      transform:translate(-50%,-50%);
-      transition:120ms;
-      box-shadow: 0 0 10px rgba(255,255,255,0.12);
+      width:12px; height:12px; border:2px solid rgba(255,255,255,.85);
+      border-radius:50%; transform:translate(-50%,-50%);
+      transition: .12s ease;
+      mix-blend-mode: screen;
     }
     .interact-active{
-      border-color: var(--good) !important;
-      background: rgba(67,255,122,0.18);
+      border-color:#00ff66 !important;
+      background: rgba(0,255,102,0.25);
       width:20px !important; height:20px !important;
-      box-shadow: 0 0 18px rgba(67,255,122,0.35);
+      box-shadow: 0 0 18px rgba(0,255,102,.35);
     }
 
-    /* Stats */
     #stats{
       position:absolute; bottom:18px; left:18px;
-      color:var(--ui); font-size:16px; text-shadow:2px 2px 0 #000;
-      user-select:none;
+      color:#fff; font-size:18px; text-shadow:2px 2px 0 #000;
+      width: 280px;
     }
-    .stat-label{ letter-spacing:0.06em; font-size:12px; color:var(--dim); margin-top:10px; }
-    .stat-bar{
-      width:220px; height:14px; background:#1b1b1b; margin-top:6px;
-      border:1px solid rgba(255,255,255,0.5);
-      box-shadow: 0 0 20px rgba(0,0,0,0.35) inset;
-    }
-    .fill{ height:100%; transition: width 120ms linear; }
-    #hp-bar{ background:#d00; width:100%; }
-    #san-bar{ background:#1f54ff; width:100%; }
+    .stat-label{ font-size:14px; letter-spacing:.08em; color:#ddd; opacity:.92; }
+    .stat-bar { width:240px; height:14px; background:#222; margin:6px 0 10px; border:1px solid rgba(255,255,255,.8); }
+    .fill{ height:100%; transition: width .18s linear, filter .18s linear; }
+    #hp-bar{ background:#c00; width:100%; }
+    #san-bar{ background:#06c; width:100%; }
 
     #quest-log{
-      margin-top:12px; font-size:12px; color:#b6b6b6;
-      max-width:340px; line-height:1.25;
+      margin-top:10px;
+      font-size: 13px;
+      color:#cfcfcf;
+      opacity:.85;
+      line-height: 1.25em;
+      filter: contrast(1.2);
     }
 
-    /* Minimap */
     #minimap-container{
       position:absolute; top:18px; right:18px;
-      width:150px; height:150px;
-      background: rgba(0,0,0,0.45);
-      border:2px solid rgba(255,255,255,0.65);
-      border-radius:50%;
+      width:156px; height:156px;
+      background: rgba(0,0,0,0.55);
+      border: 2px solid rgba(255,255,255,.8);
+      border-radius: 50%;
       overflow:hidden;
-      box-shadow: 0 0 30px rgba(0,0,0,0.6);
+      box-shadow: 0 0 18px rgba(0,0,0,.65);
     }
-    #minimap{ width:100%; height:100%; opacity:0.9; }
+    #minimap{ width:100%; height:100%; opacity:.9; }
 
     #interaction-text{
       position:absolute; top:60%; left:50%;
-      transform:translateX(-50%);
-      color: var(--warn);
-      font-size:18px; font-weight:bold;
-      text-shadow:1px 1px 0 #000;
+      transform: translateX(-50%);
+      color:#ff0; font-size:20px; font-weight:bold;
+      text-shadow: 1px 1px 0 #000;
       display:none;
-      padding: 6px 10px;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 10px;
-      backdrop-filter: blur(3px);
+      filter: saturate(1.2);
     }
 
-    /* Note overlay */
+    /* Overlays */
     #note-overlay{
       display:none;
-      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      width:min(520px, calc(100vw - 40px));
-      background:#f2f2f2; color:#000; padding:18px 18px 14px;
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      width:min(520px, 90vw);
+      background:#f3f3f3;
+      color:#000;
+      padding: 18px 18px 14px;
       font-family: "Times New Roman", serif;
-      border: 10px solid #191919;
-      box-shadow: 0 0 70px rgba(0,0,0,0.85);
+      border: 10px solid #222;
+      box-shadow: 0 0 60px #000;
       pointer-events:auto;
       text-align:left;
-      z-index:30;
     }
-    #note-overlay h2{ margin:0 0 10px; }
-    #note-overlay p{ margin:0 0 14px; line-height:1.35; }
+    #note-overlay h2{ margin:0 0 8px; }
+    #note-overlay p{ margin:0 0 12px; font-size: 18px; }
 
-    /* Start / Death screen */
     #start-screen, #death-screen{
-      position:fixed; inset:0;
+      position:absolute; inset:0;
       background: rgba(0,0,0,0.95);
       display:flex; flex-direction:column;
       justify-content:center; align-items:center;
       z-index:20; color:#fff; pointer-events:auto;
+      text-align:center;
       padding: 24px;
     }
 
-    .panel{
-      width: min(720px, calc(100vw - 48px));
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(12,12,12,0.65);
-      box-shadow: 0 0 60px rgba(0,0,0,0.8);
-      border-radius: 18px;
-      padding: 18px 18px 16px;
-      backdrop-filter: blur(6px);
+    .glitch-text{ animation: glitch .32s infinite; }
+    @keyframes glitch{
+      0%{ transform:translate(0); }
+      20%{ transform:translate(-2px,2px); }
+      40%{ transform:translate(-2px,-2px); }
+      60%{ transform:translate(2px,2px); }
+      80%{ transform:translate(2px,-2px); }
+      100%{ transform:translate(0); }
     }
 
     button{
-      pointer-events:auto;
-      padding:12px 18px;
-      font-size:1.1em;
-      background:#b30000; color:#fff;
-      border:none; cursor:pointer;
+      padding: 12px 22px;
+      font-size: 1.1em;
+      background: #b00000;
+      color: #fff;
+      border: none;
+      cursor: pointer;
       margin-top: 14px;
-      font-family:"Courier New", monospace;
-      border-radius: 14px;
-      box-shadow: 0 0 25px rgba(255,0,0,0.12);
+      font-family: "Courier New", monospace;
+      letter-spacing: .05em;
+      box-shadow: 0 0 18px rgba(176,0,0,.18);
     }
-    button:hover{ background:#e10000; box-shadow:0 0 24px rgba(255,0,0,0.35); }
+    button:hover{ background:#e00000; box-shadow: 0 0 22px rgba(224,0,0,.28); }
 
     input{
       pointer-events:auto;
-      width: 100%;
-      padding: 12px 12px;
-      font-family:"Courier New", monospace;
-      background: rgba(0,0,0,0.35);
+      padding: 10px 12px;
+      font-size: 1em;
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.4);
       color: #fff;
-      border: 1px solid rgba(255,255,255,0.22);
-      border-radius: 12px;
       outline: none;
       margin-top: 10px;
-    }
-    input:focus{ border-color: rgba(255,255,255,0.5); }
-
-    .glitch-text{ animation: glitch 0.32s infinite; }
-    @keyframes glitch{
-      0%{ transform:translate(0) }
-      20%{ transform:translate(-2px,2px) }
-      40%{ transform:translate(-2px,-2px) }
-      60%{ transform:translate(2px,2px) }
-      80%{ transform:translate(2px,-2px) }
-      100%{ transform:translate(0) }
+      width: min(360px, 85vw);
+      font-family: "Courier New", monospace;
     }
 
-    /* PS2-ish overlay (scanlines/noise/vignette) */
-    #crt-overlay{
-      position:fixed; inset:0; pointer-events:none; z-index:12;
-      background:
-        radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.55) 100%),
-        repeating-linear-gradient(
-          to bottom,
-          rgba(255,255,255,0.03) 0px,
-          rgba(255,255,255,0.03) 1px,
-          rgba(0,0,0,0.00) 2px,
-          rgba(0,0,0,0.00) 4px
-        );
-      mix-blend-mode: screen;
-      opacity: 0.45;
+    /* Sanity-driven overlays */
+    #vignette{
+      position:absolute; inset:0; z-index:9; pointer-events:none;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,.55) 76%, rgba(0,0,0,.92) 100%);
+      opacity: .12;
+      transition: opacity .2s linear;
+      mix-blend-mode: multiply;
     }
-
-    #noise-overlay{
-      position:fixed; inset:0; pointer-events:none; z-index:13;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-      opacity: 0.06;
+    #scanlines{
+      position:absolute; inset:0; z-index:9; pointer-events:none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 1px,
+        rgba(0,0,0,0.00) 2px,
+        rgba(0,0,0,0.00) 4px
+      );
+      opacity: .08;
+      transition: opacity .2s linear;
       mix-blend-mode: overlay;
+    }
+    #noise{
+      position:absolute; inset:0; z-index:9; pointer-events:none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+      opacity: .00;
+      transition: opacity .15s linear;
+      mix-blend-mode: soft-light;
     }
   </style>
 </head>
 <body>
+
   <div id="ui-layer">
     <div id="crosshair"></div>
-    <div id="minimap-container"><canvas id="minimap" width="150" height="150"></canvas></div>
+    <div id="minimap-container"><canvas id="minimap" width="300" height="300"></canvas></div>
 
     <div id="stats">
       <div class="stat-label">DATA INTEGRITY (HP)</div>
       <div class="stat-bar"><div id="hp-bar" class="fill"></div></div>
-
       <div class="stat-label">LOGIC STABILITY (SANITY)</div>
       <div class="stat-bar"><div id="san-bar" class="fill"></div></div>
-
-      <div id="quest-log">OBJECTIVE: FIND THE SERVER ROOM KEY</div>
+      <div id="quest-log">OBJECTIVE: FIND THE SERVER ROOM KEY.<br/>THE CITY REMEMBERS YOUR NAME.</div>
     </div>
 
     <div id="interaction-text">PRESS [E] TO INTERACT</div>
   </div>
 
-  <div id="crt-overlay"></div>
-  <div id="noise-overlay"></div>
+  <div id="vignette"></div>
+  <div id="scanlines"></div>
+  <div id="noise"></div>
 
   <div id="note-overlay">
     <h2 id="note-title">NOTE</h2>
@@ -211,38 +191,24 @@
   </div>
 
   <div id="start-screen">
-    <div class="panel">
-      <h1 class="glitch-text" style="font-size:3.2em; color:#ff2a2a; margin:0 0 6px;">GLITCH CITY</h1>
-      <div style="color:#d0d0d0; margin-bottom: 10px;">
-        <div>SECTOR 7 IS CORRUPTED. IT RAINS MEMORY.</div>
-        <div style="opacity:.85; margin-top:6px; font-size:.95em">
-          WASD Move · SHIFT Run · E Interact · SPACE Jump · ESC Pause/Unlock
-        </div>
-      </div>
+    <h1 class="glitch-text" style="font-size:3.2em; color:#ff2020; margin:0;">GLITCH CITY</h1>
+    <p style="max-width:720px; opacity:.9;">
+      SECTOR 7 IS CORRUPTED. IT RAINS DATA. YOU ARE A MEMORY THAT WON'T DELETE.
+    </p>
+    <p style="opacity:.85;">WASD Move • SHIFT Run • SPACE Jump • E Interact • LMB Attack • T Speak</p>
 
-      <div style="margin-top:12px; color:#bdbdbd; font-size:.95em; line-height:1.25;">
-        This city prints your name into its screens. The Firewalls read it back to you.
-      </div>
+    <input id="name-input" maxlength="18" placeholder="CHOOSE YOUR NAME (it will appear in the city)"/>
+    <button id="start-btn">ENTER SIMULATION</button>
 
-      <label style="display:block; margin-top:14px; color:#bdbdbd; font-size:.85em; letter-spacing:.08em;">
-        ENTER YOUR NAME (it will appear in TVs & whispers)
-      </label>
-      <input id="name-input" maxlength="18" placeholder="e.g. DEFER / NAILMAN / ???" />
-
-      <button id="start-btn">ENTER SIMULATION</button>
-
-      <div style="margin-top:10px; color:#8f8f8f; font-size:.85em;">
-        Tip: allow audio on click. Headphones recommended.
-      </div>
-    </div>
+    <p style="opacity:.55; margin-top:16px; font-size: 12px;">
+      Tip: sanity is fragile — the walls are not.
+    </p>
   </div>
 
   <div id="death-screen" style="display:none;">
-    <div class="panel" style="text-align:center;">
-      <h1 style="color:#ff2a2a; margin:0 0 6px;">CONNECTION LOST</h1>
-      <p id="death-reason" style="color:#d0d0d0; margin: 0 0 14px;"></p>
-      <button onclick="location.reload()">RESPAWN</button>
-    </div>
+    <h1 style="color:#ff3030; margin:0 0 10px;">CONNECTION LOST</h1>
+    <p id="death-reason" style="opacity:.9;"></p>
+    <button onclick="location.reload()">RESPAWN</button>
   </div>
 
   <script type="importmap">
@@ -256,910 +222,490 @@
 
   <script type="module">
     import * as THREE from "three";
+    import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
-    /************************************************************
-     * WHY YOU SAW “ScriptProcessorNode is deprecated”
-     * ----------------------------------------------------------
-     * That warning happens when code uses ScriptProcessorNode
-     * (old audio callback API). This version DOES NOT use it.
-     * We generate audio with Oscillators + BufferSource noise
-     * + filters + modulation (modern WebAudio graph).
-     ************************************************************/
-
-    /* ----------------------------
-       CONFIG / STATE
-    ---------------------------- */
+    // ========= CONFIG =========
     const config = {
-      mapSize: 44,      // grid size
-      scale: 4,         // world units per cell
-      enemyCount: 9,
-      npcCount: 6,
+      mapSize: 44,
+      scale: 4,
+      enemyCount: 8,
       itemCount: 16,
-
-      // movement feel
-      walkAccel: 90,
-      runAccel: 140,
-      friction: 10,
-      gravity: 24,
-      jumpVel: 13,
-
-      // interaction
-      interactDist: 3.8,
-
-      // PS2-ish render scale (lower = chunkier)
-      renderScale: 0.62,
-
-      // mouse smoothing (higher = smoother / less jitter)
-      mouseSmoothing: 0.22,
-      mouseSensitivity: 0.0022
+      wallScareCount: 10,
+      nameGraffitiCount: 10,
+      pocketRooms: 3,
+      maxEnemies: 14
     };
 
+    const assets = {
+      // your images (place in /assets)
+      back: "assets/back.png",
+      back2: "assets/back2.png",
+      object1: "assets/object1.png",
+      fiend: "assets/fiend.png",
+      npc: "assets/npc.png",
+      npc3: "assets/npc3.png",
+      image1: "assets/image.png",
+      image2: "assets/image2.png"
+    };
+
+    // ========= STATE =========
     const state = {
       hp: 100,
       sanity: 100,
       isPlaying: false,
-      paused: false,
-
-      inventory: new Set(),
-      objective: "FIND THE SERVER ROOM KEY",
-
-      glitchMode: 0,       // 0 none, 1 light, 2 heavy
-      playerName: "UNKNOWN",
-
-      lastWhisperAt: 0,
-      whisperCooldown: 9.0, // seconds
-
-      gotKey: false
+      glitch: 0,           // 0..1
+      playerName: "NO-ONE",
+      hasKey: false,
+      weapon: "none",      // none | pipe | shard
+      ammo: 0,
+      lastShot: 0,
+      ttsCooldown: 0,
+      timeAlive: 0
     };
 
-    const ui = {
-      hpBar: document.getElementById("hp-bar"),
-      sanBar: document.getElementById("san-bar"),
-      quest: document.getElementById("quest-log"),
-      crosshair: document.getElementById("crosshair"),
-      itext: document.getElementById("interaction-text"),
-      note: document.getElementById("note-overlay"),
-      noteTitle: document.getElementById("note-title"),
-      noteContent: document.getElementById("note-content"),
-      start: document.getElementById("start-screen"),
-      death: document.getElementById("death-screen"),
-      deathReason: document.getElementById("death-reason"),
-      nameInput: document.getElementById("name-input")
-    };
+    // ========= UI REFS =========
+    const hpBar = document.getElementById("hp-bar");
+    const sanBar = document.getElementById("san-bar");
+    const vignette = document.getElementById("vignette");
+    const scanlines = document.getElementById("scanlines");
+    const noiseOverlay = document.getElementById("noise");
 
-    function setObjective(txt){
-      state.objective = txt;
-      ui.quest.textContent = "OBJECTIVE: " + txt;
+    function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    // ========= THREE SETUP =========
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a22);
+
+    const camera = new THREE.PerspectiveCamera(78, innerWidth/innerHeight, 0.08, 160);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:"high-performance" });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // PS2-ish touch: slightly lower internal res on purpose (optional)
+    // renderer.setPixelRatio(Math.min(devicePixelRatio, 1.15));
+
+    // Fog (will thicken as sanity drops)
+    scene.fog = new THREE.FogExp2(0x14141a, 0.018);
+
+    // Lights: start brighter
+    const hemi = new THREE.HemisphereLight(0xcfd6ff, 0x1a1020, 0.9);
+    scene.add(hemi);
+
+    const keyLight = new THREE.DirectionalLight(0xdde6ff, 0.9);
+    keyLight.position.set(60, 80, 40);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight);
+
+    const flashlight = new THREE.SpotLight(0xfff6e6, 2.2, 52, Math.PI/7, 0.55, 1);
+    flashlight.position.set(0,0,0);
+    flashlight.target.position.set(0,0,-1);
+    camera.add(flashlight);
+    camera.add(flashlight.target);
+    scene.add(camera);
+
+    const controls = new PointerLockControls(camera, document.body);
+
+    // ========= TEXTURES (procedural + loaded) =========
+    const texLoader = new THREE.TextureLoader();
+    const textures = {};
+    const loaded = {};
+
+    function makeCanvasTexture(drawFn, size=512){
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const ctx = c.getContext("2d");
+      drawFn(ctx, size);
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 2;
+      return t;
     }
 
-    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-    /* ----------------------------
-       AUDIO (ominous + breathing) + TTS
-    ---------------------------- */
-    let audio = null;
-
-    function ensureAudio(){
-      if (audio) return;
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-      // master
-      const master = ctx.createGain();
-      master.gain.value = 0.55;
-      master.connect(ctx.destination);
-
-      // subtle compressor-ish feel (DynamicsCompressorNode is fine)
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -24;
-      comp.knee.value = 28;
-      comp.ratio.value = 6;
-      comp.attack.value = 0.01;
-      comp.release.value = 0.25;
-      comp.connect(master);
-
-      // drone (two detuned oscillators)
-      const droneGain = ctx.createGain();
-      droneGain.gain.value = 0.0; // fade in later
-      droneGain.connect(comp);
-
-      const o1 = ctx.createOscillator();
-      const o2 = ctx.createOscillator();
-      o1.type = "sawtooth";
-      o2.type = "triangle";
-      o1.frequency.value = 43.65;     // low F-ish
-      o2.frequency.value = 43.65 * 1.498; // dissonant interval (~tritone-ish)
-      o2.detune.value = -11;
-
-      const droneLP = ctx.createBiquadFilter();
-      droneLP.type = "lowpass";
-      droneLP.frequency.value = 420;
-      droneLP.Q.value = 1.2;
-
-      const wobble = ctx.createOscillator();
-      wobble.type = "sine";
-      wobble.frequency.value = 0.12;
-
-      const wobbleGain = ctx.createGain();
-      wobbleGain.gain.value = 120; // mod LP cutoff
-      wobble.connect(wobbleGain);
-      wobbleGain.connect(droneLP.frequency);
-
-      o1.connect(droneLP);
-      o2.connect(droneLP);
-      droneLP.connect(droneGain);
-
-      // noise bed
-      const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-      const data = noiseBuf.getChannelData(0);
-      for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * 0.85;
-
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBuf;
-      noise.loop = true;
-
-      const noiseBP = ctx.createBiquadFilter();
-      noiseBP.type = "bandpass";
-      noiseBP.frequency.value = 120;
-      noiseBP.Q.value = 0.8;
-
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.value = 0.0; // fade in later
-
-      noise.connect(noiseBP);
-      noiseBP.connect(noiseGain);
-      noiseGain.connect(comp);
-
-      // breathing (amplitude-modulated filtered noise)
-      const breathNoise = ctx.createBufferSource();
-      breathNoise.buffer = noiseBuf;
-      breathNoise.loop = true;
-
-      const breathLP = ctx.createBiquadFilter();
-      breathLP.type = "lowpass";
-      breathLP.frequency.value = 220;
-      breathLP.Q.value = 0.9;
-
-      const breathGain = ctx.createGain();
-      breathGain.gain.value = 0.0;
-
-      // breathe LFO
-      const breathLFO = ctx.createOscillator();
-      breathLFO.type = "sine";
-      breathLFO.frequency.value = 0.23; // slow
-
-      const breathDepth = ctx.createGain();
-      breathDepth.gain.value = 0.28;
-
-      breathLFO.connect(breathDepth);
-      breathDepth.connect(breathGain.gain);
-
-      breathNoise.connect(breathLP);
-      breathLP.connect(breathGain);
-      breathGain.connect(comp);
-
-      // occasional pulse “heartbeat”
-      const thump = ctx.createOscillator();
-      thump.type = "sine";
-      thump.frequency.value = 52;
-
-      const thumpGain = ctx.createGain();
-      thumpGain.gain.value = 0.0;
-      thump.connect(thumpGain);
-      thumpGain.connect(comp);
-
-      // start nodes
-      o1.start(); o2.start();
-      wobble.start();
-      noise.start();
-      breathNoise.start();
-      breathLFO.start();
-      thump.start();
-
-      audio = {
-        ctx,
-        master,
-        comp,
-        droneGain,
-        noiseGain,
-        breathGain,
-        thumpGain,
-        setIntensity(v){
-          // v: 0..1
-          const t = ctx.currentTime;
-          droneGain.gain.cancelScheduledValues(t);
-          noiseGain.gain.cancelScheduledValues(t);
-          breathGain.gain.cancelScheduledValues(t);
-
-          droneGain.gain.linearRampToValueAtTime(0.10 + 0.22*v, t + 0.25);
-          noiseGain.gain.linearRampToValueAtTime(0.02 + 0.10*v, t + 0.35);
-          breathGain.gain.linearRampToValueAtTime(0.04 + 0.18*v, t + 0.35);
-        },
-        thump(){
-          const t = ctx.currentTime;
-          thumpGain.gain.cancelScheduledValues(t);
-          thumpGain.gain.setValueAtTime(0.0, t);
-          thumpGain.gain.linearRampToValueAtTime(0.20, t + 0.02);
-          thumpGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    textures.concrete = makeCanvasTexture((ctx,S)=>{
+      ctx.fillStyle="#3b3b3f"; ctx.fillRect(0,0,S,S);
+      for(let i=0;i<14000;i++){
+        ctx.globalAlpha=0.08;
+        ctx.fillStyle = Math.random()<0.5 ? "#0b0b0f" : "#ffffff";
+        ctx.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+      }
+      ctx.globalAlpha=1;
+    });
+    textures.brick = makeCanvasTexture((ctx,S)=>{
+      ctx.fillStyle="#3f1a1a"; ctx.fillRect(0,0,S,S);
+      ctx.strokeStyle="#1e0b0b"; ctx.lineWidth=4;
+      for(let y=0;y<S;y+=64){
+        for(let x=0;x<S;x+=128){
+          const off = (y/64)%2===0 ? 0 : 64;
+          ctx.strokeRect(x+off, y, 128, 64);
+          if(Math.random()>0.35){
+            ctx.fillStyle="rgba(0,0,0,0.22)";
+            ctx.fillRect(x+off+8, y+10, 110, 38);
+          }
         }
-      };
+      }
+    });
+    textures.wood = makeCanvasTexture((ctx,S)=>{
+      ctx.fillStyle="#4a2a1a"; ctx.fillRect(0,0,S,S);
+      ctx.strokeStyle="rgba(0,0,0,0.25)";
+      for(let i=0;i<S;i+=4){
+        ctx.beginPath();
+        ctx.moveTo(0, i + (Math.random()*10-5));
+        ctx.lineTo(S, i + (Math.random()*10-5));
+        ctx.stroke();
+      }
+    });
+    textures.grass = makeCanvasTexture((ctx,S)=>{
+      ctx.fillStyle="#142114"; ctx.fillRect(0,0,S,S);
+      for(let i=0;i<22000;i++){
+        ctx.globalAlpha=0.06;
+        ctx.fillStyle = Math.random()<0.5 ? "#2c612c" : "#0a0f0a";
+        ctx.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+      }
+      ctx.globalAlpha=1;
+    });
+    textures.static = makeCanvasTexture((ctx,S)=>{
+      ctx.fillStyle="#000"; ctx.fillRect(0,0,S,S);
+      for(let i=0;i<52000;i++){
+        ctx.globalAlpha=1;
+        const v = (Math.random()*255)|0;
+        ctx.fillStyle=`rgb(${v},${v},${v})`;
+        ctx.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+      }
+    });
 
-      audio.setIntensity(0.35);
+    function tryLoadTexture(key, url){
+      return new Promise((resolve)=>{
+        texLoader.load(url, (t)=>{
+          t.wrapS = t.wrapT = THREE.RepeatWrapping;
+          t.anisotropy = 2;
+          loaded[key] = t;
+          resolve(true);
+        }, undefined, ()=>resolve(false));
+      });
     }
 
-    function speak(text, {rate=0.9, pitch=0.75, vol=0.85} = {}){
-      // Real-time TTS via SpeechSynthesis (browser-native)
-      if (!("speechSynthesis" in window)) return;
+    await Promise.all([
+      tryLoadTexture("back", assets.back),
+      tryLoadTexture("back2", assets.back2),
+      tryLoadTexture("object1", assets.object1),
+      tryLoadTexture("fiend", assets.fiend),
+      tryLoadTexture("npc", assets.npc),
+      tryLoadTexture("npc3", assets.npc3),
+      tryLoadTexture("image1", assets.image1),
+      tryLoadTexture("image2", assets.image2),
+    ]);
+
+    // ========= AUDIO (AudioWorklet breath/noise + optional TTS) =========
+    let audioCtx = null;
+    let master = null;
+    let breathNode = null;
+    let droneOsc = null;
+    let droneGain = null;
+
+    async function ensureAudio(){
+      if(audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      master = audioCtx.createGain();
+      master.gain.value = 0.55;
+      master.connect(audioCtx.destination);
+
+      // Worklet: breathy noise + low thumps
+      const workletCode = `
+        class BreathNoise extends AudioWorkletProcessor {
+          constructor(){
+            super();
+            this.t = 0;
+            this.phase = 0;
+            this.seed = 1234567;
+            this.breath = 0;
+          }
+          rnd(){
+            // xorshift-ish
+            this.seed ^= this.seed << 13;
+            this.seed ^= this.seed >> 17;
+            this.seed ^= this.seed << 5;
+            return (this.seed >>> 0) / 4294967295;
+          }
+          process(inputs, outputs, params){
+            const out = outputs[0];
+            const ch0 = out[0];
+            const sr = sampleRate;
+
+            for(let i=0;i<ch0.length;i++){
+              const time = this.t / sr;
+
+              // Breath envelope (slow, uneasy)
+              const breathRate = 0.18 + 0.03*Math.sin(time*0.37);
+              this.breath = 0.55 + 0.45*Math.sin(2*Math.PI*breathRate*time + Math.sin(time*0.11));
+
+              // White noise
+              const n = (this.rnd()*2-1);
+
+              // Cheap “air” filter by mixing noise with envelope
+              let air = n * (0.08 + 0.11*this.breath);
+
+              // Low thump pulse
+              const th = Math.sin(2*Math.PI*1.1*time) * Math.sin(2*Math.PI*0.25*time);
+              let thump = th * 0.02;
+
+              // Subtle digital flutter
+              const flutter = (Math.sin(2*Math.PI*12.0*time) > 0.96) ? 0.03 : 0.0;
+
+              ch0[i] = air + thump + flutter;
+              this.t++;
+            }
+
+            // mono -> stereo if needed
+            if(out.length > 1){
+              const ch1 = out[1];
+              for(let i=0;i<ch0.length;i++) ch1[i] = ch0[i]*0.98;
+            }
+            return true;
+          }
+        }
+        registerProcessor('breath-noise', BreathNoise);
+      `;
+      const blob = new Blob([workletCode], { type:"application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await audioCtx.audioWorklet.addModule(url);
+
+      breathNode = new AudioWorkletNode(audioCtx, "breath-noise");
+      const breathGain = audioCtx.createGain();
+      breathGain.gain.value = 0.55;
+
+      // ominous drone (two detuned sines)
+      droneOsc = audioCtx.createOscillator();
+      droneOsc.type = "sine";
+      droneOsc.frequency.value = 43;
+
+      const droneOsc2 = audioCtx.createOscillator();
+      droneOsc2.type = "sine";
+      droneOsc2.frequency.value = 43.8;
+
+      droneGain = audioCtx.createGain();
+      droneGain.gain.value = 0.22;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 520;
+
+      breathNode.connect(breathGain).connect(filter);
+      droneOsc.connect(droneGain).connect(filter);
+      droneOsc2.connect(droneGain).connect(filter);
+      filter.connect(master);
+
+      droneOsc.start();
+      droneOsc2.start();
+    }
+
+    // TTS (Web Speech API) — press T or triggers will call speak()
+    function speak(text){
+      if(!("speechSynthesis" in window)) return;
+      if(state.ttsCooldown > 0) return;
+      state.ttsCooldown = 4.0;
+
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = rate;
-      u.pitch = pitch;
-      u.volume = vol;
-      // pick a voice if available (optional)
-      const voices = speechSynthesis.getVoices?.() || [];
-      const en = voices.find(v => /en/i.test(v.lang)) || voices[0];
-      if (en) u.voice = en;
-      speechSynthesis.cancel(); // keep it “radio-like”
+      u.rate = 0.92;
+      u.pitch = 0.72;
+      u.volume = 0.9;
+      speechSynthesis.cancel();
       speechSynthesis.speak(u);
     }
 
-    function whisper(text){
-      // spooky timing + shorter phrases
-      speak(text, { rate: 0.82, pitch: 0.60, vol: 0.78 });
-      if (audio) audio.thump();
-    }
+    // ========= WORLD =========
+    const colliders = [];
+    const interactables = [];
+    const enemies = [];
+    const bullets = [];
+    const decals = []; // animated name graffiti
 
-    /* ----------------------------
-       THREE SETUP (PS2-ish)
-    ---------------------------- */
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05040a);
-    scene.fog = new THREE.FogExp2(0x05040a, 0.045);
+    // Map grid (for minimap + spawn logic)
+    const map = [];
+    const raycaster = new THREE.Raycaster();
+    let currentTarget = null;
 
-    const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 120);
-    camera.position.set(5, 1.7, 5);
+    // Ground
+    const groundGeo = new THREE.PlaneGeometry(config.mapSize*config.scale, config.mapSize*config.scale);
+    const groundMat = new THREE.MeshStandardMaterial({ map: textures.grass, roughness: 1.0 });
+    groundMat.map.repeat.set(8,8);
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    ground.position.set(config.mapSize*config.scale/2, 0, config.mapSize*config.scale/2);
+    ground.receiveShadow = true;
+    scene.add(ground);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // keep it stable
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.shadowMap.enabled = false; // PS2 vibe + perf
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    document.body.appendChild(renderer.domElement);
-
-    // Low-res render target to mimic PS2 resolution
-    const rt = new THREE.WebGLRenderTarget(16, 16, {
-      depthBuffer: true,
-      stencilBuffer: false
+    // Sky dome (your backgrounds)
+    const skyGeo = new THREE.SphereGeometry(120, 18, 14);
+    const skyMat = new THREE.MeshBasicMaterial({
+      map: loaded.back2 || loaded.back || null,
+      color: loaded.back2 || loaded.back ? 0xffffff : 0x0b0b10,
+      side: THREE.BackSide
     });
+    if(skyMat.map){ skyMat.map.repeat.set(1,1); }
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    sky.position.set(config.mapSize*config.scale/2, 24, config.mapSize*config.scale/2);
+    scene.add(sky);
 
-    // Post scene: fullscreen quad upscales RT with pixelated sampling + slight color crunch
-    const postScene = new THREE.Scene();
-    const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
-
-    const postMat = new THREE.ShaderMaterial({
-      uniforms: {
-        tDiffuse: { value: rt.texture },
-        time: { value: 0 },
-        glitch: { value: 0 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main(){
-          vUv = uv;
-          gl_Position = vec4(position.xy, 0.0, 1.0);
-        }
-      `,
-      fragmentShader: `
-        precision mediump float;
-        uniform sampler2D tDiffuse;
-        uniform float time;
-        uniform float glitch;
-        varying vec2 vUv;
-
-        float rand(vec2 p){
-          return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453);
-        }
-
-        void main(){
-          vec2 uv = vUv;
-
-          // subtle jitter + chroma split when glitching
-          float j = (rand(vec2(time, uv.y)) - 0.5) * 0.0025 * (0.2 + glitch);
-          uv.x += j;
-
-          vec3 col;
-          float split = 0.0025 * glitch;
-          col.r = texture2D(tDiffuse, uv + vec2(split, 0.0)).r;
-          col.g = texture2D(tDiffuse, uv).g;
-          col.b = texture2D(tDiffuse, uv - vec2(split, 0.0)).b;
-
-          // “color crunch”
-          col = floor(col * 22.0) / 22.0;
-
-          // scanline-ish dim
-          float s = 0.06 * sin(uv.y * 800.0);
-          col *= 1.0 - s;
-
-          // vignette
-          vec2 p = uv - 0.5;
-          float v = smoothstep(0.78, 0.25, dot(p,p));
-          col *= v;
-
-          // occasional harsh slice
-          if(glitch > 0.6){
-            float band = step(0.985, rand(vec2(floor(time*8.0), uv.y*12.0)));
-            col = mix(col, vec3(col.b, col.r, col.g), band*0.65);
-          }
-
-          gl_FragColor = vec4(col, 1.0);
-        }
-      `
-    });
-
-    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), postMat);
-    postScene.add(quad);
-
-    // Lights
-    const hemi = new THREE.HemisphereLight(0x3b3b5a, 0x06060a, 0.45);
-    scene.add(hemi);
-
-    const moon = new THREE.DirectionalLight(0xa9c7ff, 0.18);
-    moon.position.set(40, 70, 30);
-    scene.add(moon);
-
-    const torch = new THREE.SpotLight(0xfff3d1, 1.55, 34, Math.PI/5.4, 0.55, 1.0);
-    torch.position.set(0,0,0);
-    torch.target.position.set(0,0,-1);
-    camera.add(torch);
-    camera.add(torch.target);
-    scene.add(camera);
-
-    /* ----------------------------
-       TEXTURES (procedural + your assets)
-    ---------------------------- */
-    const textures = {};
-    const loader = new THREE.TextureLoader();
-
-    function texFromImage(url){
-      const t = loader.load(url);
-      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.minFilter = THREE.NearestFilter;
-      t.magFilter = THREE.NearestFilter;
-      return t;
-    }
-
-    function createTexture(type, color1, color2){
-      const size = 256;
-      const c = document.createElement("canvas");
-      c.width = c.height = size;
-      const g = c.getContext("2d");
-
-      g.fillStyle = color1;
-      g.fillRect(0,0,size,size);
-
-      if(type === "noise"){
-        g.globalAlpha = 0.14;
-        for(let i=0;i<14000;i++){
-          g.fillStyle = Math.random() > 0.5 ? color2 : "#000";
-          g.fillRect(Math.random()*size, Math.random()*size, 2, 2);
-        }
-        g.globalAlpha = 1;
-      }
-      if(type === "brick"){
-        g.strokeStyle = color2;
-        g.lineWidth = 3;
-        for(let y=0;y<size;y+=32){
-          for(let x=0;x<size;x+=64){
-            const o = (y/32)%2===0?0:32;
-            g.strokeRect(x+o, y, 64, 32);
-            if(Math.random()>0.55){
-              g.fillStyle = "rgba(0,0,0,0.18)";
-              g.fillRect(x+o+6, y+6, 52, 20);
-            }
-          }
-        }
-      }
-      if(type === "wood"){
-        g.strokeStyle = color2;
-        g.lineWidth = 2;
-        for(let i=0;i<size;i+=4){
-          g.beginPath();
-          g.moveTo(0, i + Math.random()*6);
-          g.lineTo(size, i + Math.random()*6);
-          g.stroke();
-        }
-      }
-      if(type === "static"){
-        for(let i=0;i<28000;i++){
-          const v = Math.random()*255|0;
-          g.fillStyle = `rgba(${v},${v},${v},1)`;
-          g.fillRect(Math.random()*size, Math.random()*size, 2, 2);
-        }
-      }
-
-      const t = new THREE.CanvasTexture(c);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(2,2);
-      t.minFilter = THREE.NearestFilter;
-      t.magFilter = THREE.NearestFilter;
-      return t;
-    }
-
-    textures.concrete = createTexture("noise", "#3a3a3a", "#111");
-    textures.brick = createTexture("brick", "#4a2424", "#230e0e");
-    textures.grass = createTexture("noise", "#132013", "#061006");
-    textures.wood = createTexture("wood", "#5a3624", "#2a160f");
-    textures.static = createTexture("static", "#000", "#fff");
-
-    // your provided images
-    const art = {
-      back:  texFromImage("./assets/back.png"),
-      back2: texFromImage("./assets/back2.png"),
-      object1: texFromImage("./assets/object1.png"),
-      fiend: texFromImage("./assets/fiend.png"),
-      npc: texFromImage("./assets/npc.png"),
-      npc3: texFromImage("./assets/npc3.png")
-    };
-
-    /* ----------------------------
-       CONTROLS (stable pointer lock + smoothing)
-    ---------------------------- */
-    const controls = {
-      locked: false,
-      yaw: 0,
-      pitch: 0,
-      mouseDX: 0,
-      mouseDY: 0,
-      smDX: 0,
-      smDY: 0
-    };
-
-    function lockPointer(){
-      renderer.domElement.requestPointerLock();
-    }
-    function unlockPointer(){
-      document.exitPointerLock();
-    }
-
-    document.addEventListener("pointerlockchange", () => {
-      controls.locked = (document.pointerLockElement === renderer.domElement);
-    });
-
-    document.addEventListener("mousemove", (e) => {
-      if(!controls.locked || !state.isPlaying || state.paused) return;
-      controls.mouseDX += e.movementX;
-      controls.mouseDY += e.movementY;
-    });
-
-    function updateLook(dt){
-      // smooth the mouse deltas to reduce jitter
-      const s = 1 - Math.pow(1 - config.mouseSmoothing, dt * 60);
-      controls.smDX += (controls.mouseDX - controls.smDX) * s;
-      controls.smDY += (controls.mouseDY - controls.smDY) * s;
-
-      // consume raw
-      controls.mouseDX *= 0.2;
-      controls.mouseDY *= 0.2;
-
-      controls.yaw   -= controls.smDX * config.mouseSensitivity;
-      controls.pitch -= controls.smDY * config.mouseSensitivity;
-
-      controls.pitch = clamp(controls.pitch, -1.45, 1.45);
-
-      camera.rotation.set(controls.pitch, controls.yaw, 0, "YXZ");
-    }
-
-    /* ----------------------------
-       WORLD / ENTITIES
-    ---------------------------- */
-    const colliders = [];        // static mesh colliders
-    const colliderBoxes = [];    // cached Box3
-    const interactables = [];    // { mesh, text(), action() }
-    const enemies = [];          // sprite monsters
-    const npcs = [];             // question apparitions
-    const tvs = [];              // broken TVs with dynamic text
-
-    const map = []; // [x][z] grid
-    const tmpBox = new THREE.Box3();
-    const tmpVec3 = new THREE.Vector3();
-
-    function clearWorld(){
-      // remove everything except camera children, lights, etc.
-      for(let i=scene.children.length-1;i>=0;i--){
-        const o = scene.children[i];
-        // keep lights + camera container already in scene
-        if(o === camera || o === hemi || o === moon) continue;
-        scene.remove(o);
-      }
-      colliders.length = 0;
-      colliderBoxes.length = 0;
-      interactables.length = 0;
-      enemies.length = 0;
-      npcs.length = 0;
-      tvs.length = 0;
-      for(let x=0;x<config.mapSize;x++){ map[x] = []; for(let z=0;z<config.mapSize;z++) map[x][z]=0; }
-    }
-
-    function addCollider(mesh){
-      colliders.push(mesh);
-      colliderBoxes.push(new THREE.Box3().setFromObject(mesh));
-    }
-
-    function refreshColliderBox(mesh){
-      const idx = colliders.indexOf(mesh);
-      if(idx >= 0) colliderBoxes[idx].setFromObject(mesh);
-    }
-
-    function cellToWorld(c){ return c * config.scale; }
-    function worldToCell(w){ return Math.floor(w / config.scale); }
-
-    function generateCity(){
-      clearWorld();
-
-      // “sky” planes using your art (avant-garde contrast)
-      const skyG = new THREE.PlaneGeometry(220, 120);
-      const skyM = new THREE.MeshBasicMaterial({ map: art.back, side: THREE.DoubleSide, transparent: true, opacity: 0.55 });
-      const sky = new THREE.Mesh(skyG, skyM);
-      sky.position.set(90, 38, 160);
-      scene.add(sky);
-
-      const sky2M = new THREE.MeshBasicMaterial({ map: art.back2, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
-      const sky2 = new THREE.Mesh(skyG, sky2M);
-      sky2.position.set(90, 28, -30);
-      sky2.rotation.y = Math.PI;
-      scene.add(sky2);
-
-      // ground
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(config.mapSize*config.scale, config.mapSize*config.scale),
-        new THREE.MeshStandardMaterial({ map: textures.grass, roughness: 1, metalness: 0 })
-      );
-      ground.rotation.x = -Math.PI/2;
-      ground.position.set(config.mapSize*config.scale/2, 0, config.mapSize*config.scale/2);
-      scene.add(ground);
-
-      // roads grid (visual only)
-      const roadMat = new THREE.MeshStandardMaterial({ map: textures.concrete, roughness: 1 });
-      for(let x=2; x<config.mapSize; x+=4){
-        const r = new THREE.Mesh(new THREE.PlaneGeometry(config.scale, config.mapSize*config.scale), roadMat);
-        r.rotation.x = -Math.PI/2;
-        r.position.set(cellToWorld(x), 0.01, config.mapSize*config.scale/2);
-        scene.add(r);
-      }
-      for(let z=2; z<config.mapSize; z+=4){
-        const r = new THREE.Mesh(new THREE.PlaneGeometry(config.mapSize*config.scale, config.scale), roadMat);
-        r.rotation.x = -Math.PI/2;
-        r.position.set(config.mapSize*config.scale/2, 0.012, cellToWorld(z));
-        scene.add(r);
-      }
-
-      // boundary walls
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
+    // City bounds walls
+    function addBounds(){
       const W = config.mapSize*config.scale;
-      const wall1 = new THREE.Mesh(new THREE.BoxGeometry(W, 16, 1), wallMat);
-      wall1.position.set(W/2, 8, -1);
-      scene.add(wall1); addCollider(wall1);
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x07070a, roughness: 1 });
+      const w1 = new THREE.Mesh(new THREE.BoxGeometry(W, 16, 1), wallMat); w1.position.set(W/2, 8, -1); scene.add(w1); colliders.push(w1);
+      const w2 = new THREE.Mesh(new THREE.BoxGeometry(W, 16, 1), wallMat); w2.position.set(W/2, 8, W+1); scene.add(w2); colliders.push(w2);
+      const w3 = new THREE.Mesh(new THREE.BoxGeometry(1, 16, W), wallMat); w3.position.set(-1, 8, W/2); scene.add(w3); colliders.push(w3);
+      const w4 = new THREE.Mesh(new THREE.BoxGeometry(1, 16, W), wallMat); w4.position.set(W+1, 8, W/2); scene.add(w4); colliders.push(w4);
+    }
 
-      const wall2 = wall1.clone();
-      wall2.position.set(W/2, 8, W+1);
-      scene.add(wall2); addCollider(wall2);
+    // ========= PREFABS =========
+    function spawnBuilding(x,z){
+      const h = 5 + Math.random()*12;
+      const geo = new THREE.BoxGeometry(3.4, h, 3.4);
+      const mat = new THREE.MeshStandardMaterial({ map: textures.brick, roughness: 1.0 });
+      mat.map.repeat.set(1, 1);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, h/2, z);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      scene.add(m);
+      colliders.push(m);
+    }
 
-      const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 16, W), wallMat);
-      wall3.position.set(-1, 8, W/2);
-      scene.add(wall3); addCollider(wall3);
+    function spawnTree(x,z,dead=false){
+      const trunkG = new THREE.CylinderGeometry(0.22, 0.32, dead ? 3.6 : 3.0, 7);
+      const trunkM = new THREE.MeshStandardMaterial({ map: textures.wood, roughness: 1.0, color: dead ? 0x2a1a12 : 0x3a2a1a });
+      const trunk = new THREE.Mesh(trunkG, trunkM);
+      trunk.position.set(x, 1.6, z);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
 
-      const wall4 = wall3.clone();
-      wall4.position.set(W+1, 8, W/2);
-      scene.add(wall4); addCollider(wall4);
-
-      // buildings/props
-      for(let x=0;x<config.mapSize;x++){
-        for(let z=0;z<config.mapSize;z++){
-          const wx = cellToWorld(x);
-          const wz = cellToWorld(z);
-
-          // keep some corridors open (roads)
-          const isRoad = (x%4===2) || (z%4===2);
-          if(isRoad) { map[x][z] = 1; continue; }
-
-          const r = Math.random();
-          if(r > 0.76) spawnBuilding(wx, wz);
-          else if(r > 0.50) spawnPosters(wx, wz);
-          else if(r > 0.44) spawnBrokenTV(wx, wz);
-          else if(r > 0.40) spawnTree(wx, wz);
+      if(!dead){
+        const leavesG = new THREE.ConeGeometry(1.9, 4.2, 8);
+        const leavesM = new THREE.MeshStandardMaterial({ color: 0x173717, roughness: 1 });
+        const leaves = new THREE.Mesh(leavesG, leavesM);
+        leaves.position.y = 2.7;
+        leaves.castShadow = true;
+        trunk.add(leaves);
+      } else {
+        // dead branches
+        for(let i=0;i<4;i++){
+          const b = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.04, 0.08, 1.2, 6),
+            new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 1 })
+          );
+          b.position.y = 2.6 + Math.random()*0.5;
+          b.rotation.z = (Math.random()*0.8 + 0.2) * (Math.random()<0.5?-1:1);
+          b.rotation.x = (Math.random()*0.8 - 0.4);
+          trunk.add(b);
         }
       }
-
-      // key loop / narrative objects
-      const keyPos = findEmptyCellFarFrom(2,2);
-      spawnKey(cellToWorld(keyPos.x), cellToWorld(keyPos.z));
-
-      spawnDoor(cellToWorld(config.mapSize-6), cellToWorld(config.mapSize-6), "SERVER ROOM");
-
-      spawnNote(cellToWorld(6), cellToWorld(6),
-        "BOOT SEQUENCE",
-        `Welcome, ${state.playerName}.\nThe city prints names into screens.\nIf a Firewall speaks yours: do not answer.\nFind the KEY.`
-      );
-
-      // NPC apparitions with questions
-      for(let i=0;i<config.npcCount;i++){
-        const p = findEmptyCellFarFrom(config.mapSize/2, config.mapSize/2);
-        spawnNPC(cellToWorld(p.x), cellToWorld(p.z), i);
-      }
-
-      // items
-      for(let i=0;i<config.itemCount;i++){
-        const p = findEmptyCellFarFrom(2, 2);
-        const wx = cellToWorld(p.x), wz = cellToWorld(p.z);
-        if(Math.random() > 0.55) spawnFood(wx, wz, Math.random() > 0.7);
-        else spawnNote(wx, wz, `LOG ${i}`, `${state.playerName} WAS HERE.\nDO NOT TRUST THE COLOR GREEN.\nTHE SKY REMEMBERS.`);
-      }
-
-      // enemies (creepy png sprites)
-      for(let i=0;i<config.enemyCount;i++){
-        spawnEnemy();
-      }
-    }
-
-    function findEmptyCellFarFrom(cx, cz){
-      // quick try search
-      for(let tries=0; tries<4000; tries++){
-        const x = 1 + (Math.random()*(config.mapSize-2) | 0);
-        const z = 1 + (Math.random()*(config.mapSize-2) | 0);
-        const dx = x - cx, dz = z - cz;
-        const d2 = dx*dx + dz*dz;
-        if(d2 < 30) continue;
-        if(map[x][z] !== 0 && map[x][z] !== 1) continue;
-        // avoid roads? optional
-        if((x%4===2) || (z%4===2)) continue;
-        return {x,z};
-      }
-      return {x: 3, z: 3};
-    }
-
-    /* ----------------------------
-       PREFABS
-    ---------------------------- */
-    function spawnBuilding(x, z){
-      const h = 5 + Math.random()*10;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(3, h, 3),
-        new THREE.MeshStandardMaterial({ map: textures.brick, roughness: 1 })
-      );
-      mesh.position.set(x, h/2, z);
-      scene.add(mesh);
-      addCollider(mesh);
-
-      const cx = worldToCell(x), cz = worldToCell(z);
-      if(map[cx] && map[cx][cz] !== undefined) map[cx][cz] = 2;
-    }
-
-    function spawnTree(x, z){
-      const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.25, 0.35, 3, 7),
-        new THREE.MeshStandardMaterial({ map: textures.wood, roughness: 1 })
-      );
-      trunk.position.set(x, 1.5, z);
-
-      const leaves = new THREE.Mesh(
-        new THREE.ConeGeometry(1.6, 3.6, 6),
-        new THREE.MeshStandardMaterial({ color: 0x1d2c1d, roughness: 1 })
-      );
-      leaves.position.y = 2.2;
-      trunk.add(leaves);
 
       scene.add(trunk);
-      addCollider(trunk);
+      colliders.push(trunk);
     }
 
-    function spawnPosters(x, z){
-      // avant-garde: your npc images as “found photographs” in the world
-      const pick = Math.random() > 0.5 ? art.npc : art.npc3;
-      const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.0, 2.3),
-        new THREE.MeshBasicMaterial({ map: pick, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+    function spawnBed(x,z){
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 0.35, 1.0),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a2f, roughness: 1 })
       );
-      plane.position.set(x, 1.6, z);
-      plane.rotation.y = Math.random()*Math.PI*2;
-      scene.add(plane);
+      base.position.set(x, 0.25, z);
+      base.castShadow = true; base.receiveShadow = true;
 
-      // make them “solid” as obstacles sometimes
-      if(Math.random() > 0.55){
-        addCollider(plane);
+      const mattress = new THREE.Mesh(
+        new THREE.BoxGeometry(2.1, 0.28, 0.92),
+        new THREE.MeshStandardMaterial({ color: 0x6a6a72, roughness: 1 })
+      );
+      mattress.position.set(0, 0.28, 0);
+      base.add(mattress);
+
+      // “stain”
+      const stain = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.8,0.6),
+        new THREE.MeshBasicMaterial({ color: 0x220006, transparent:true, opacity:0.35 })
+      );
+      stain.rotation.x = -Math.PI/2;
+      stain.position.set(0.3, 0.16, 0);
+      mattress.add(stain);
+
+      scene.add(base);
+      colliders.push(base);
+
+      // chance: item under bed
+      if(Math.random() < 0.35){
+        spawnPickup(x + (Math.random()*0.6-0.3), z + (Math.random()*0.4-0.2), Math.random()<0.6 ? "pipe" : "badpill");
       }
     }
 
-    function makeTVTexture(text){
-      // dynamic canvas texture (player name injected)
-      const c = document.createElement("canvas");
-      c.width = 256; c.height = 256;
-      const g = c.getContext("2d");
-
-      g.fillStyle = "#090909";
-      g.fillRect(0,0,256,256);
-
-      // background static
-      g.globalAlpha = 0.55;
-      g.drawImage(makeStaticCanvas(256,256), 0,0);
-      g.globalAlpha = 1;
-
-      g.fillStyle = "#eaeaea";
-      g.font = "bold 18px Courier New";
-      wrapText(g, text, 16, 42, 224, 22);
-
-      // redacted bar
-      g.fillStyle = "rgba(255, 45, 45, 0.22)";
-      g.fillRect(0, 200, 256, 18);
-
-      const t = new THREE.CanvasTexture(c);
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.minFilter = THREE.NearestFilter;
-      t.magFilter = THREE.NearestFilter;
-      return { tex: t, canvas: c, ctx: g };
-    }
-
-    function makeStaticCanvas(w,h){
-      const c = document.createElement("canvas");
-      c.width=w; c.height=h;
-      const g = c.getContext("2d");
-      const img = g.createImageData(w,h);
-      for(let i=0;i<img.data.length;i+=4){
-        const v = (Math.random()*255)|0;
-        img.data[i]=v; img.data[i+1]=v; img.data[i+2]=v; img.data[i+3]=255;
+    function spawnNails(x,z){
+      const group = new THREE.Group();
+      const count = 8 + (Math.random()*10|0);
+      for(let i=0;i<count;i++){
+        const nail = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.03, 0.04, 0.55, 6),
+          new THREE.MeshStandardMaterial({ color: 0x3a2f2f, roughness: 1, metalness: 0.1 })
+        );
+        nail.position.set((Math.random()-0.5)*1.6, 0.28, (Math.random()-0.5)*1.2);
+        nail.rotation.x = (Math.random()*0.8 - 0.4);
+        nail.rotation.z = (Math.random()*0.8 - 0.4);
+        nail.castShadow = true;
+        group.add(nail);
       }
-      g.putImageData(img,0,0);
-      return c;
+      group.position.set(x, 0, z);
+      scene.add(group);
+      colliders.push(group);
     }
 
-    function wrapText(ctx, text, x, y, maxWidth, lineHeight){
-      const lines = String(text).split("\n");
-      for(const raw of lines){
-        const words = raw.split(" ");
-        let line = "";
-        for(const w of words){
-          const test = line + w + " ";
-          if(ctx.measureText(test).width > maxWidth){
-            ctx.fillText(line, x, y);
-            line = w + " ";
-            y += lineHeight;
-          } else line = test;
-        }
-        ctx.fillText(line, x, y);
-        y += lineHeight;
-      }
-    }
-
-    function spawnBrokenTV(x, z){
+    function spawnBrokenTV(x,z){
       const tv = new THREE.Mesh(
-        new THREE.BoxGeometry(1.05, 0.82, 0.75),
-        new THREE.MeshStandardMaterial({ color: 0x262626, roughness: 1 })
+        new THREE.BoxGeometry(1.05, 0.82, 0.82),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a2d, roughness: 1 })
       );
-      tv.position.set(x, 0.42, z);
+      tv.position.set(x, 0.41, z);
+      tv.castShadow = true;
 
       const screen = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.88, 0.64),
+        new THREE.PlaneGeometry(0.88, 0.66),
         new THREE.MeshBasicMaterial({ map: textures.static })
       );
-      screen.position.z = 0.39;
-
-      // player name injected into “broadcast”
-      const broadcast = makeTVTexture(
-        `HELLO ${state.playerName}\n\nDO NOT LOOK\nBEHIND YOU.\n\nSIGNAL: WEAK`
-      );
-
-      // alternate between static and broadcast
-      const screen2 = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.88, 0.64),
-        new THREE.MeshBasicMaterial({ map: broadcast.tex, transparent: true, opacity: 0.0 })
-      );
-      screen2.position.z = 0.395;
-
+      screen.position.z = 0.42;
       tv.add(screen);
-      tv.add(screen2);
 
-      const light = new THREE.PointLight(0xa8f7ff, 0.9, 3.2);
-      light.position.set(0, 0, 0.9);
+      const light = new THREE.PointLight(0xaadfff, 1.0, 3.0);
+      light.position.set(0, 0.2, 0.9);
       tv.add(light);
 
-      tv.userData = { type:"tv", light, screenStatic: screen, screenMsg: screen2, broadcast, phase: Math.random()*10 };
+      tv.userData = { type:"tv", light, screen };
 
       scene.add(tv);
-      addCollider(tv);
+      colliders.push(tv);
 
-      tvs.push(tv);
-
+      // Interactable: TV whispers your name (TTS)
       interactables.push({
         mesh: tv,
-        text: () => `LISTEN (${state.playerName})`,
+        text: "LISTEN",
         action: () => {
-          // speak something eerie
-          whisper(`${state.playerName}... you left your name in the screen.`);
-          state.sanity = clamp(state.sanity - 6, 0, 100);
-          updateHUD();
+          const lines = [
+            `${state.playerName}… the city is learning your shape.`,
+            `Don't trust the map, ${state.playerName}.`,
+            `If you see yourself on the wall… run.`,
+            `Your name tastes like iron.`
+          ];
+          speak(lines[(Math.random()*lines.length)|0]);
+          // a little sanity tick down
+          addSanity(-3 - Math.random()*4);
         }
       });
     }
 
-    function spawnDoor(x, z, label){
-      const door = new THREE.Mesh(
-        new THREE.BoxGeometry(2.0, 3.9, 0.24),
-        new THREE.MeshStandardMaterial({ map: art.object1, roughness: 1, metalness: 0 })
-      );
-      door.position.set(x, 1.95, z);
-      scene.add(door);
-      addCollider(door);
-
-      let opened = false;
-
-      interactables.push({
-        mesh: door,
-        text: () => opened ? "OPEN" : `UNLOCK ${label}`,
-        action: () => {
-          if(opened) return;
-
-          if(!state.gotKey){
-            whisper(`No key, ${state.playerName}.`);
-            state.sanity = clamp(state.sanity - 4, 0, 100);
-            updateHUD();
-            return;
-          }
-
-          opened = true;
-          whisper(`Key accepted. Welcome home, ${state.playerName}.`);
-          setObjective("ENTER THE SERVER ROOM");
-          // rotate door open
-          const target = door.rotation.y + Math.PI/2;
-          const t0 = performance.now();
-          const dur = 600;
-
-          const tick = () => {
-            const t = clamp((performance.now()-t0)/dur, 0, 1);
-            door.rotation.y = THREE.MathUtils.lerp(door.rotation.y, target, 0.12);
-            refreshColliderBox(door);
-            if(t < 1) requestAnimationFrame(tick);
-            else {
-              // remove collider so player can pass
-              const idx = colliders.indexOf(door);
-              if(idx >= 0){ colliders.splice(idx,1); colliderBoxes.splice(idx,1); }
-              // win-ish: add a final note
-              spawnNote(x+2, z+2, "SERVER ROOM", `THE SERVER ROOM IS EMPTY.\nONLY YOUR NAME REMAINS:\n\n${state.playerName}`);
-            }
-          };
-          tick();
-        }
-      });
-    }
-
-    function spawnFood(x, z, rotten){
+    function spawnNote(x,z,title,content,creepy=0.35){
       const mesh = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(0.28, 0),
-        new THREE.MeshStandardMaterial({ color: rotten ? 0x3eff4d : 0xffa427, emissive: 0x111111, roughness: 1 })
-      );
-      mesh.position.set(x, 0.45, z);
-      scene.add(mesh);
-
-      interactables.push({
-        mesh,
-        text: () => rotten ? "EAT GLITCHED MEAT" : "EAT DATA PACK",
-        action: () => {
-          scene.remove(mesh);
-          if(rotten){
-            state.glitchMode = 2;
-            state.sanity = clamp(state.sanity - 22, 0, 100);
-            whisper(`${state.playerName}... you swallowed a bad memory.`);
-            setTimeout(() => state.glitchMode = 0, 5200);
-          }else{
-            state.hp = clamp(state.hp + 18, 0, 100);
-            state.sanity = clamp(state.sanity + 10, 0, 100);
-          }
-          updateHUD();
-        }
-      });
-    }
-
-    function spawnNote(x, z, title, content){
-      const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.55, 0.70),
-        new THREE.MeshBasicMaterial({ color: 0xf0f0f0, side: THREE.DoubleSide })
+        new THREE.PlaneGeometry(0.52, 0.66),
+        new THREE.MeshBasicMaterial({ color: 0xfafafa, side: THREE.DoubleSide })
       );
       mesh.rotation.x = -Math.PI/2;
       mesh.position.set(x, 0.05, z);
@@ -1167,647 +713,910 @@
 
       interactables.push({
         mesh,
-        text: () => "READ NOTE",
+        text: "READ NOTE",
         action: () => {
           openNote(title, content);
-          // optionally speak some of it
-          speak(`${title}. ${content.replace(/\n/g, " ")}`, { rate: 0.92, pitch: 0.72, vol: 0.85 });
+          // sanity impact scales with creepiness
+          addSanity(-(6*creepy + 2));
+          // sometimes it “talks”
+          if(Math.random() < 0.35){
+            speak(content.length > 120 ? content.slice(0, 120) : content);
+          }
         }
       });
     }
 
-    function spawnKey(x, z){
-      const mesh = new THREE.Mesh(
-        new THREE.TorusGeometry(0.25, 0.08, 10, 16),
-        new THREE.MeshStandardMaterial({ color: 0xe7e7e7, emissive: 0x222222, roughness: 0.9 })
-      );
-      mesh.position.set(x, 0.6, z);
-      mesh.rotation.x = Math.PI/2;
-      scene.add(mesh);
-
-      const glow = new THREE.PointLight(0xffffff, 0.6, 4);
-      glow.position.set(0, 0.7, 0);
-      mesh.add(glow);
+    function spawnWallScare(x,z,texKey){
+      // A wall panel with scary image; staring at it drains sanity (on interact)
+      const tex = loaded[texKey];
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex || textures.static,
+        color: tex ? 0xffffff : 0xbdbdbd
+      });
+      if(tex){
+        tex.minFilter = THREE.LinearFilter;
+      }
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), mat);
+      plane.position.set(x, 1.7, z);
+      plane.rotation.y = Math.random() * Math.PI*2;
+      scene.add(plane);
+      colliders.push(plane);
 
       interactables.push({
-        mesh,
-        text: () => "TAKE KEY",
+        mesh: plane,
+        text: "LOOK",
         action: () => {
-          scene.remove(mesh);
-          state.gotKey = true;
-          state.inventory.add("key");
-          whisper(`${state.playerName}. you found it.`);
-          setObjective("RETURN TO THE SERVER ROOM DOOR");
+          addSanity(-10 - Math.random()*10);
+          // hard glitch burst
+          state.glitch = Math.min(1, state.glitch + 0.4);
+          // whisper
+          if(Math.random() < 0.75){
+            speak(`${state.playerName}… it is behind the texture.`);
+          }
         }
       });
     }
 
-    function spawnNPC(x, z, idx){
-      const tex = (idx % 2 === 0) ? art.npc : art.npc3;
-      const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.9, 2.5),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.92, side: THREE.DoubleSide })
+    function makeDrippingNameTexture(name){
+      const S = 512;
+      const c = document.createElement("canvas");
+      c.width = c.height = S;
+      const ctx = c.getContext("2d");
+
+      const drops = Array.from({length: 70}, ()=>({
+        x: Math.random()*S,
+        y: Math.random()*S*0.3,
+        v: 20 + Math.random()*70,
+        w: 2 + Math.random()*5,
+        a: 0.35 + Math.random()*0.55
+      }));
+
+      function draw(t){
+        ctx.clearRect(0,0,S,S);
+
+        // grime base
+        ctx.fillStyle = "rgba(255,255,255,0.03)";
+        ctx.fillRect(0,0,S,S);
+
+        // text
+        ctx.save();
+        ctx.translate(S/2, S/2);
+        ctx.rotate((Math.sin(t*0.4)*0.03));
+        ctx.font = "bold 80px Courier New";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(120,0,20,0.95)";
+        ctx.shadowColor = "rgba(0,0,0,0.65)";
+        ctx.shadowBlur = 18;
+        ctx.fillText(name, 0, -20);
+        ctx.restore();
+
+        // drips (cranberry)
+        for(const d of drops){
+          const yy = d.y + (t * d.v) % (S*1.2);
+          ctx.globalAlpha = d.a;
+          ctx.fillStyle = "rgba(150,0,25,1)";
+          ctx.fillRect(d.x, yy, d.w, 30 + Math.sin((d.x+yy)*0.01)*12);
+          ctx.beginPath();
+          ctx.arc(d.x + d.w*0.5, yy+36, 6 + Math.sin(t*2 + d.x*0.01)*3, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // subtle noise
+        ctx.globalAlpha = 0.08;
+        for(let i=0;i<1200;i++){
+          ctx.fillStyle = Math.random()<0.5 ? "#000" : "#fff";
+          ctx.fillRect(Math.random()*S, Math.random()*S, 1, 1);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.anisotropy = 2;
+
+      return { tex, tick: (t)=>{ draw(t); tex.needsUpdate = true; } };
+    }
+
+    function spawnNameGraffiti(x,z){
+      const { tex, tick } = makeDrippingNameTexture(state.playerName);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent:true, opacity: 0.95 });
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.2), mat);
+      p.position.set(x, 1.6, z);
+      p.rotation.y = Math.random()*Math.PI*2;
+      scene.add(p);
+      decals.push({ mesh:p, tick, wobble: Math.random()*10 });
+
+      // sometimes: interacting makes you lose sanity (because recognition)
+      interactables.push({
+        mesh: p,
+        text: "TOUCH YOUR NAME",
+        action: () => {
+          addSanity(-(6 + Math.random()*10));
+          state.glitch = Math.min(1, state.glitch + 0.25);
+          speak(`${state.playerName}. ${state.playerName}. ${state.playerName}.`);
+        }
+      });
+    }
+
+    function spawnDoor(x,z,label,onOpen){
+      const door = new THREE.Mesh(
+        new THREE.BoxGeometry(2.0, 4.0, 0.25),
+        new THREE.MeshStandardMaterial({ map: textures.wood, color: 0x4a2525, roughness: 1 })
       );
-      mesh.position.set(x, 1.4, z);
-      scene.add(mesh);
+      door.position.set(x, 2, z);
+      door.castShadow = true;
+      scene.add(door);
+      colliders.push(door);
 
-      // make them “haunt” (not solid)
-      const q = [
-        { q:`${state.playerName}, do you remember your first face?`, a:["YES","NO"], good:0, bad:1 },
-        { q:`The grass is real. Agree?`, a:["AGREE","DISAGREE"], good:1, bad:0 },
-        { q:`If a screen says your name, what do you do?`, a:["ANSWER","RUN"], good:1, bad:0 },
-        { q:`Pick a door.`, a:["LEFT","RIGHT"], good: Math.random()>0.5 ? 0 : 1, bad: Math.random()>0.5 ? 1 : 0 }
-      ][idx % 4];
+      let opened = false;
+      interactables.push({
+        mesh: door,
+        text: opened ? "…" : `OPEN ${label}`,
+        action: () => {
+          if(opened) return;
+          opened = true;
 
-      npcs.push({ mesh, q });
+          // creaky open
+          const targetRot = door.rotation.y + (Math.random()<0.5 ? 1 : -1) * (Math.PI/2);
+          const start = door.rotation.y;
+          const t0 = performance.now();
+
+          const idx = colliders.indexOf(door);
+          if(idx>-1) colliders.splice(idx,1);
+
+          (function anim(){
+            const t = (performance.now()-t0)/260;
+            door.rotation.y = lerp(start, targetRot, clamp01(t));
+            if(t<1) requestAnimationFrame(anim);
+            else {
+              if(onOpen) onOpen();
+            }
+          })();
+
+          speak(`Door accepted. ${state.playerName}.`);
+        }
+      });
+    }
+
+    function spawnPickup(x,z,type){
+      const color = (type==="pipe") ? 0xaaaaaa :
+                    (type==="shard") ? 0x66ccff :
+                    (type==="key") ? 0xffdd55 :
+                    (type==="badpill") ? 0x77ff55 :
+                    0xffaa00;
+
+      const m = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.28),
+        new THREE.MeshStandardMaterial({ color, emissive: 0x111111, roughness: 0.6 })
+      );
+      m.position.set(x, 0.55, z);
+      m.castShadow = true;
+      scene.add(m);
+
+      const text =
+        type==="pipe" ? "TAKE RUSTY PIPE" :
+        type==="shard" ? "TAKE DATA SHARD" :
+        type==="key" ? "TAKE SERVER KEY" :
+        type==="badpill" ? "TAKE PILLS" :
+        "TAKE";
 
       interactables.push({
-        mesh,
-        text: () => "SPEAK",
+        mesh: m,
+        text,
         action: () => {
-          // present as note overlay with choices
-          const title = "APPARITION";
-          const content =
-            `${q.q}\n\n[1] ${q.a[0]}\n[2] ${q.a[1]}\n\n(Press 1 or 2)`;
-          openNote(title, content);
-          whisper(q.q);
-
-          // temporary input handler
-          const onKey = (e) => {
-            if(e.code !== "Digit1" && e.code !== "Digit2") return;
-            document.removeEventListener("keydown", onKey);
-
-            const pick = (e.code === "Digit1") ? 0 : 1;
-
-            closeNote(true);
-
-            if(pick === q.good){
-              state.sanity = clamp(state.sanity + 10, 0, 100);
-              state.hp = clamp(state.hp + 6, 0, 100);
-              whisper(`Correct, ${state.playerName}.`);
-            }else{
-              state.sanity = clamp(state.sanity - 14, 0, 100);
-              state.hp = clamp(state.hp - 6, 0, 100);
-              state.glitchMode = 1;
-              whisper(`Wrong. It remembers you.`);
-              setTimeout(() => state.glitchMode = 0, 2000);
-            }
-            updateHUD();
-
-            // vanish sometimes
-            if(Math.random() > 0.55){
-              scene.remove(mesh);
-            }
-          };
-          document.addEventListener("keydown", onKey);
+          scene.remove(m);
+          if(type==="pipe"){
+            state.weapon = "pipe";
+            speak(`A pipe. Better than prayers, ${state.playerName}.`);
+          } else if(type==="shard"){
+            state.weapon = "shard";
+            state.ammo += 8 + (Math.random()*6|0);
+            speak(`A shard that edits flesh.`);
+          } else if(type==="key"){
+            state.hasKey = true;
+            document.getElementById("quest-log").innerHTML = "OBJECTIVE: OPEN THE SERVER ROOM DOOR.<br/>THE CITY IS QUIETER NOW.";
+            speak(`Key acquired. The server room is awake.`);
+          } else if(type==="badpill"){
+            // bad item: big glitch, sanity hit
+            addSanity(-(12 + Math.random()*12));
+            state.hp = Math.min(100, state.hp + 8);
+            state.glitch = Math.min(1, state.glitch + 0.6);
+            speak(`Sweet relief. Bitter consequences.`);
+          }
         }
       });
     }
 
     function spawnEnemy(){
-      // creepy PNG monster sprite that faces player
-      const mat = new THREE.MeshBasicMaterial({
-        map: art.fiend,
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false
-      });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.2), mat);
+      // Billboard PNG monster
+      const choices = [loaded.fiend, loaded.npc, loaded.npc3, loaded.object1].filter(Boolean);
+      const t = choices.length ? choices[(Math.random()*choices.length)|0] : null;
 
-      const W = config.mapSize*config.scale;
-      mesh.position.set(Math.random()*(W-10)+5, 1.1, Math.random()*(W-10)+5);
-      scene.add(mesh);
+      const mat = new THREE.SpriteMaterial({
+        map: t || textures.static,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.98
+      });
+
+      const spr = new THREE.Sprite(mat);
+      spr.scale.set(2.4, 3.2, 1);
+      spr.position.set(Math.random()*(config.mapSize*config.scale-10)+5, 1.8, Math.random()*(config.mapSize*config.scale-10)+5);
+      scene.add(spr);
 
       enemies.push({
-        mesh,
-        speed: 2.2 + Math.random()*1.6,
-        aggro: 18 + Math.random()*10,
-        hitDist: 1.35,
-        wanderT: Math.random()*10,
+        mesh: spr,
+        hp: 28 + (Math.random()*22|0),
+        speed: 1.7 + Math.random()*1.8,
+        aggro: 0.0,
         phase: Math.random()*10
       });
     }
 
-    /* ----------------------------
-       NOTE UI
-    ---------------------------- */
+    function damageEnemy(e, dmg){
+      e.hp -= dmg;
+      e.aggro = 1.0;
+      // flash
+      e.mesh.material.opacity = 0.65;
+      setTimeout(()=>{ if(e.mesh?.material) e.mesh.material.opacity = 0.98; }, 80);
+
+      if(e.hp <= 0){
+        // drop chance
+        if(Math.random() < 0.45){
+          spawnPickup(e.mesh.position.x, e.mesh.position.z, Math.random()<0.65 ? "shard" : "badpill");
+        }
+        scene.remove(e.mesh);
+        const idx = enemies.indexOf(e);
+        if(idx>-1) enemies.splice(idx,1);
+      }
+    }
+
+    // ========= NOTE OVERLAY =========
     function openNote(title, content){
-      ui.note.style.display = "block";
-      ui.noteTitle.textContent = title;
-      ui.noteContent.textContent = content;
-      state.paused = true;
-      unlockPointer();
+      document.getElementById("note-title").innerText = title;
+      document.getElementById("note-content").innerText = content;
+      document.getElementById("note-overlay").style.display = "block";
+      document.exitPointerLock?.();
+    }
+    document.getElementById("note-close").addEventListener("click", ()=>{
+      document.getElementById("note-overlay").style.display = "none";
+      controls.lock();
+    });
+
+    // ========= SANITY / HP =========
+    function updateBars(){
+      hpBar.style.width = `${Math.max(0, state.hp)}%`;
+      sanBar.style.width = `${Math.max(0, state.sanity)}%`;
+      // more sanity loss => harsher look
+      const sat = lerp(1.2, 0.6, 1 - state.sanity/100);
+      sanBar.style.filter = `saturate(${sat})`;
     }
 
-    function closeNote(silent=false){
-      ui.note.style.display = "none";
-      state.paused = false;
-      if(state.isPlaying) lockPointer();
-      if(!silent && Math.random() > 0.6) whisper(`${state.playerName}... put it away.`);
+    function addSanity(delta){
+      state.sanity = Math.max(0, Math.min(100, state.sanity + delta));
+      updateBars();
+    }
+    function addHP(delta){
+      state.hp = Math.max(0, Math.min(100, state.hp + delta));
+      updateBars();
     }
 
-    document.getElementById("note-close").addEventListener("click", () => closeNote());
-
-    /* ----------------------------
-       WEATHER (data rain) + minimap
-    ---------------------------- */
-    const rainCount = 8000;
-    const rainGeo = new THREE.BufferGeometry();
-    const rainPos = new Float32Array(rainCount * 3);
-    const worldW = () => config.mapSize * config.scale;
-
-    function initRain(){
-      for(let i=0;i<rainCount*3;i+=3){
-        rainPos[i]   = Math.random() * (worldW()+40) - 20;
-        rainPos[i+1] = Math.random() * 80 + 2;
-        rainPos[i+2] = Math.random() * (worldW()+40) - 20;
-      }
-      rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
-      const rainMat = new THREE.PointsMaterial({ color: 0xa9a9a9, size: 0.08, transparent: true, opacity: 0.65 });
-      const rain = new THREE.Points(rainGeo, rainMat);
-      rain.userData.isRain = true;
-      scene.add(rain);
-      return rain;
-    }
-
-    let rainSystem = null;
-
-    function updateWeather(dt){
-      if(!rainSystem) return;
-      const a = rainSystem.geometry.attributes.position.array;
-      for(let i=1;i<rainCount*3;i+=3){
-        a[i] -= 26 * dt;
-        if(a[i] < 0.2) a[i] = 80 + Math.random()*15;
-      }
-      rainSystem.geometry.attributes.position.needsUpdate = true;
-
-      // flicker & “lightning”
-      if(Math.random() > 0.997){
-        hemi.intensity = 1.4;
-        setTimeout(()=>hemi.intensity=0.45, 80);
-      }
-      // torch flicker
-      torch.intensity = 1.35 + Math.sin(performance.now()*0.01)*0.10 + (Math.random()-0.5)*0.07;
-    }
-
-    // minimap
+    // ========= MINIMAP =========
     const mapCanvas = document.getElementById("minimap");
     const mapCtx = mapCanvas.getContext("2d");
 
-    function updateMinimap(){
-      const W = 150, H = 150;
+    function drawMinimap(){
+      const W = mapCanvas.width, H = mapCanvas.height;
       mapCtx.clearRect(0,0,W,H);
-      mapCtx.fillStyle = "rgba(0,0,0,0.55)";
+      mapCtx.fillStyle = "#000";
       mapCtx.fillRect(0,0,W,H);
 
+      const cx = W/2, cy = H/2;
       const px = camera.position.x;
       const pz = camera.position.z;
-      const scale = 1.8;
 
-      // player center
-      mapCtx.fillStyle = "#43ff7a";
-      mapCtx.beginPath();
-      mapCtx.arc(75,75,4,0,Math.PI*2);
-      mapCtx.fill();
+      // sanity -> glitches & lies
+      const s = state.sanity/100;
+      const lie = (1-s) * (Math.random() < (0.08 + (1-s)*0.22) ? 1 : 0);
+      const zoom = 2.0 + (1-s)*1.4;
 
-      // colliders
-      mapCtx.fillStyle = "rgba(200,200,200,0.35)";
-      for(let i=0;i<colliders.length;i++){
-        const o = colliders[i];
-        const rx = (o.position.x - px) * scale + 75;
-        const ry = (o.position.z - pz) * scale + 75;
-        if(rx>0 && rx<W && ry>0 && ry<H) mapCtx.fillRect(rx-2, ry-2, 4, 4);
+      // rotate minimap slightly at low sanity
+      const rot = (1-s) * (Math.sin(performance.now()*0.001)*0.6);
+
+      mapCtx.save();
+      mapCtx.translate(cx, cy);
+      mapCtx.rotate(rot);
+
+      // draw nearby colliders as blocks
+      mapCtx.fillStyle = "#444";
+      for(const obj of colliders){
+        const rx = (obj.position.x - px) * zoom;
+        const ry = (obj.position.z - pz) * zoom;
+        if(Math.abs(rx) < cx && Math.abs(ry) < cy){
+          mapCtx.fillRect(rx-3, ry-3, 6, 6);
+        }
       }
 
       // enemies
-      mapCtx.fillStyle = "rgba(255,70,70,0.75)";
+      mapCtx.fillStyle = "#ff3030";
       for(const e of enemies){
-        const rx = (e.mesh.position.x - px) * scale + 75;
-        const ry = (e.mesh.position.z - pz) * scale + 75;
-        if(rx>0 && rx<W && ry>0 && ry<H) mapCtx.fillRect(rx-2, ry-2, 4, 4);
-      }
-    }
-
-    /* ----------------------------
-       INTERACTION (ray-ish without Raycaster)
-       We use distance checks to avoid expensive raycasting on billboards.
-    ---------------------------- */
-    let currentTarget = null;
-
-    function getForward(){
-      const v = new THREE.Vector3(0,0,-1);
-      v.applyEuler(camera.rotation);
-      return v.normalize();
-    }
-
-    function checkInteraction(){
-      currentTarget = null;
-
-      const fwd = getForward();
-      const p = camera.position;
-
-      let best = null;
-      let bestScore = Infinity;
-
-      for(const it of interactables){
-        const m = it.mesh;
-        if(!m || !m.parent) continue;
-
-        tmpVec3.setFromMatrixPosition(m.matrixWorld);
-        const d = tmpVec3.distanceTo(p);
-        if(d > config.interactDist) continue;
-
-        // angle check (is it roughly in front)
-        const dir = tmpVec3.clone().sub(p).normalize();
-        const dot = dir.dot(fwd);
-        if(dot < 0.72) continue;
-
-        const score = d - dot; // prefer close & centered
-        if(score < bestScore){
-          bestScore = score;
-          best = it;
+        let ex = (e.mesh.position.x - px) * zoom;
+        let ey = (e.mesh.position.z - pz) * zoom;
+        if(lie){
+          ex += (Math.random()*120-60);
+          ey += (Math.random()*120-60);
+        }
+        if(Math.abs(ex) < cx && Math.abs(ey) < cy){
+          mapCtx.fillRect(ex-2, ey-2, 4, 4);
         }
       }
 
-      if(best){
-        ui.crosshair.classList.add("interact-active");
-        ui.itext.style.display = "block";
-        ui.itext.textContent = "[E] " + (typeof best.text === "function" ? best.text() : best.text);
-        currentTarget = best;
-      }else{
-        ui.crosshair.classList.remove("interact-active");
-        ui.itext.style.display = "none";
+      // false pings at low sanity
+      if((1-s) > 0.35){
+        const n = (1-s)*6;
+        for(let i=0;i<n;i++){
+          mapCtx.fillStyle = Math.random() < 0.5 ? "#ff0" : "#0ff";
+          mapCtx.fillRect((Math.random()*W - cx) * 0.65, (Math.random()*H - cy) * 0.65, 2, 2);
+        }
+      }
+
+      // player dot
+      mapCtx.fillStyle = "#00ff66";
+      mapCtx.beginPath();
+      mapCtx.arc(0, 0, 5, 0, Math.PI*2);
+      mapCtx.fill();
+
+      mapCtx.restore();
+
+      // vignette circle mask effect (fake circular minimap)
+      mapCtx.globalCompositeOperation = "source-in";
+      mapCtx.beginPath();
+      mapCtx.arc(cx, cy, cx-2, 0, Math.PI*2);
+      mapCtx.fill();
+      mapCtx.globalCompositeOperation = "source-over";
+
+      // scan noise if low sanity
+      if((1-s) > 0.45){
+        mapCtx.globalAlpha = 0.18;
+        mapCtx.fillStyle = "#fff";
+        for(let i=0;i<600;i++){
+          mapCtx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+        }
+        mapCtx.globalAlpha = 1;
       }
     }
 
-    /* ----------------------------
-       MOVEMENT + COLLISION
-    ---------------------------- */
+    // ========= INTERACTION =========
+    function checkInteraction(){
+      raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+      const list = interactables.map(i=>i.mesh);
+      const hits = raycaster.intersectObjects(list, true);
+      if(hits.length && hits[0].distance < 3.8){
+        const hitObj = hits[0].object;
+        const data = interactables.find(i => i.mesh === hitObj || i.mesh === hitObj.parent);
+        if(data){
+          document.getElementById("crosshair").classList.add("interact-active");
+          const it = document.getElementById("interaction-text");
+          it.style.display = "block";
+          it.innerText = "[E] " + data.text;
+          currentTarget = data;
+          return;
+        }
+      }
+      document.getElementById("crosshair").classList.remove("interact-active");
+      document.getElementById("interaction-text").style.display = "none";
+      currentTarget = null;
+    }
+
+    // ========= SHOOT / MELEE =========
+    function tryAttack(){
+      const now = performance.now()/1000;
+      if(state.weapon === "none"){
+        // weak shove
+        meleeHit(10, 1.8);
+        return;
+      }
+      if(state.weapon === "pipe"){
+        meleeHit(22, 2.4);
+        return;
+      }
+      if(state.weapon === "shard"){
+        if(state.ammo <= 0){
+          speak("Empty.");
+          return;
+        }
+        if(now - state.lastShot < 0.22) return;
+        state.lastShot = now;
+        state.ammo--;
+
+        // raycast forward damage
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        const hits = raycaster.intersectObjects(enemies.map(e=>e.mesh));
+        if(hits.length && hits[0].distance < 22){
+          const target = enemies.find(e => e.mesh === hits[0].object);
+          if(target){
+            damageEnemy(target, 18 + (Math.random()*8|0));
+            // shard makes reality worse
+            state.glitch = Math.min(1, state.glitch + 0.08);
+          }
+        } else {
+          // miss: tiny glitch anyway
+          state.glitch = Math.min(1, state.glitch + 0.03);
+        }
+      }
+    }
+
+    function meleeHit(dmg, range){
+      raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+      const hits = raycaster.intersectObjects(enemies.map(e=>e.mesh));
+      if(hits.length && hits[0].distance < range){
+        const target = enemies.find(e => e.mesh === hits[0].object);
+        if(target){
+          damageEnemy(target, dmg + (Math.random()*6|0));
+          // knockback
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          target.mesh.position.add(dir.multiplyScalar(0.65));
+        }
+      }
+    }
+
+    // ========= RAIN (data) =========
+    const rainCount = 7000;
+    const rainGeo = new THREE.BufferGeometry();
+    const rainPos = new Float32Array(rainCount*3);
+    const W = config.mapSize*config.scale;
+    for(let i=0;i<rainCount*3;i+=3){
+      rainPos[i] = Math.random()*W;
+      rainPos[i+1] = Math.random()*80;
+      rainPos[i+2] = Math.random()*W;
+    }
+    rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+    const rainMat = new THREE.PointsMaterial({ color:0xbfc7ff, size:0.07, transparent:true, opacity:0.35 });
+    const rain = new THREE.Points(rainGeo, rainMat);
+    scene.add(rain);
+
+    function updateWeather(dt){
+      const p = rain.geometry.attributes.position.array;
+      const sp = 18 + (1 - state.sanity/100)*26;
+      for(let i=1;i<rainCount*3;i+=3){
+        p[i] -= sp*dt;
+        if(p[i] < 0) p[i] = 80;
+      }
+      rain.geometry.attributes.position.needsUpdate = true;
+
+      // lightning more frequent at low sanity
+      const s = state.sanity/100;
+      if(Math.random() > (0.997 - (1-s)*0.01)){
+        hemi.intensity = 1.8;
+        keyLight.intensity = 1.4;
+        setTimeout(()=>{
+          hemi.intensity = lerp(0.35, 0.9, s);
+          keyLight.intensity = lerp(0.28, 0.9, s);
+        }, 80);
+      }
+    }
+
+    // ========= COLLISION (simple) =========
+    const tmpBox = new THREE.Box3();
+    const playerBox = new THREE.Box3();
+    const playerSize = new THREE.Vector3(0.6, 1.7, 0.6);
+
+    function resolveCollisions(prevPos){
+      playerBox.setFromCenterAndSize(camera.position, playerSize);
+
+      for(const c of colliders){
+        tmpBox.setFromObject(c);
+        if(tmpBox.intersectsBox(playerBox)){
+          // revert to previous pos
+          camera.position.copy(prevPos);
+          return;
+        }
+      }
+    }
+
+    // ========= GENERATION =========
+    function generateWorld(){
+      // clear old (simple approach: refresh page recommended, but we keep minimal)
+      // initialize grid
+      for(let x=0;x<config.mapSize;x++){
+        map[x] = [];
+        for(let z=0;z<config.mapSize;z++) map[x][z] = 0;
+      }
+
+      addBounds();
+
+      // Populate
+      for(let x=0;x<config.mapSize;x++){
+        for(let z=0;z<config.mapSize;z++){
+          const wx = x*config.scale;
+          const wz = z*config.scale;
+
+          // Keep start area clearer
+          const distStart = Math.hypot(wx-8, wz-8);
+          if(distStart < 12) continue;
+
+          const r = Math.random();
+          if(r > 0.86) spawnBuilding(wx, wz);
+          else if(r > 0.72) spawnTree(wx, wz, Math.random()<0.28);
+          else if(r > 0.66) spawnBed(wx, wz);
+          else if(r > 0.62) spawnNails(wx, wz);
+          else if(r > 0.58) spawnBrokenTV(wx, wz);
+        }
+      }
+
+      // Name graffiti (your “cranberry drip” identity)
+      for(let i=0;i<config.nameGraffitiCount;i++){
+        const x = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        const z = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        spawnNameGraffiti(x, z);
+      }
+
+      // Wall scares (image.png/image2.png)
+      for(let i=0;i<config.wallScareCount;i++){
+        const x = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        const z = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        spawnWallScare(x, z, Math.random()<0.5 ? "image1" : "image2");
+      }
+
+      // Notes (some reduce sanity harder)
+      const noteLines = [
+        "The map is a polite liar.",
+        "If your name appears twice, do not look for the third.",
+        "The doors are not entrances. They are edits.",
+        "Your breathing is not yours anymore.",
+        "The rain is not water. It's a memory leak."
+      ];
+      for(let i=0;i<config.itemCount;i++){
+        const x = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        const z = (Math.random()*(config.mapSize-6)+3)*config.scale;
+        const creepy = 0.2 + Math.random()*0.8;
+        spawnNote(x, z, "LOG " + (i+1), noteLines[(Math.random()*noteLines.length)|0], creepy);
+      }
+
+      // Key + doors (server room)
+      spawnPickup(16, 16, "key");
+
+      // A door that needs key: server room
+      spawnDoor(10, 10, "SERVER ROOM", ()=>{
+        if(!state.hasKey){
+          speak("ACCESS DENIED.");
+          addSanity(-8);
+          // close itself by reloading page? keep simple: punish
+          return;
+        }
+        // Win-ish moment
+        speak(`Welcome, ${state.playerName}. You were expected.`);
+        document.getElementById("quest-log").innerHTML = "OBJECTIVE: SURVIVE THE DOWNLOAD.<br/>THE SERVER IS LOOKING AT YOU.";
+        // Spawn extra enemies as “ending pressure”
+        for(let i=0;i<4;i++){
+          if(enemies.length < config.maxEnemies) spawnEnemy();
+        }
+      });
+
+      // Mysterious pathways: pocket doors teleport you
+      for(let i=0;i<config.pocketRooms;i++){
+        const x = (Math.random()*(config.mapSize-10)+5)*config.scale;
+        const z = (Math.random()*(config.mapSize-10)+5)*config.scale;
+        spawnDoor(x, z, "MAINTENANCE", ()=>{
+          // teleport pocket (small safe-ish chamber)
+          const px = Math.random()*(config.mapSize*config.scale-20)+10;
+          const pz = Math.random()*(config.mapSize*config.scale-20)+10;
+          camera.position.set(px, 1.7, pz);
+          addSanity(+6); // sometimes relief
+          state.glitch = Math.max(0, state.glitch - 0.12);
+          // chance for an easter egg
+          if(Math.random() < 0.35){
+            speak(`You found a place the city forgot.`);
+            spawnPickup(px + 2, pz, Math.random()<0.5 ? "pipe" : "shard");
+          }
+        });
+      }
+
+      // Enemies (PNG monsters)
+      for(let i=0;i<config.enemyCount;i++) spawnEnemy();
+
+      // Also: a “nice” trap background (the meadow) appears when sanity is low (artistic dissonance)
+      // We'll swap sky texture sometimes in loop.
+    }
+
+    // ========= INPUT + MOVEMENT (FIXED) =========
     const clock = new THREE.Clock();
     const vel = new THREE.Vector3();
-    const move = { f:false, b:false, l:false, r:false, run:false };
-    let canJump = false;
+    let moveF=false, moveB=false, moveL=false, moveR=false, sprint=false, canJump=false;
 
-    function collidePlayer(){
-      // cheap collision: if inside any box, push back along opposite of forward
-      const p = camera.position;
+    function onKeyDown(e){
+      if(e.code === "KeyW") moveF = true;
+      if(e.code === "KeyS") moveB = true;  // FIXED: S is backward
+      if(e.code === "KeyA") moveL = true;
+      if(e.code === "KeyD") moveR = true;
+      if(e.code === "ShiftLeft" || e.code === "ShiftRight") sprint = true;
 
-      // only check nearby colliders (by distance)
-      for(let i=0;i<colliders.length;i++){
-        const o = colliders[i];
-        const box = colliderBoxes[i];
-        if(!box) continue;
-
-        // quick sphere-ish reject
-        const dx = o.position.x - p.x;
-        const dz = o.position.z - p.z;
-        if(dx*dx + dz*dz > 25) continue;
-
-        if(box.containsPoint(p)){
-          // push out: compute closest point on box then move away
-          const cp = box.clampPoint(p, new THREE.Vector3());
-          const push = p.clone().sub(cp);
-          if(push.lengthSq() < 0.00001){
-            // fallback push backward
-            const back = getForward().multiplyScalar(-0.12);
-            p.add(back);
-          }else{
-            push.normalize().multiplyScalar(0.14);
-            p.add(push);
-          }
+      if(e.code === "Space"){
+        if(canJump){
+          vel.y = 6.2;
+          canJump = false;
         }
       }
-    }
 
-    function updateMovement(dt){
-      if(!controls.locked) return;
-
-      // friction + gravity
-      vel.x -= vel.x * config.friction * dt;
-      vel.z -= vel.z * config.friction * dt;
-      vel.y -= config.gravity * dt;
-
-      const acc = move.run ? config.runAccel : config.walkAccel;
-
-      // build input dir in camera space
-      const dir = new THREE.Vector3(
-        (move.r ? 1 : 0) - (move.l ? 1 : 0),
-        0,
-        (move.f ? 1 : 0) - (move.b ? 1 : 0)
-      );
-      if(dir.lengthSq() > 0){
-        dir.normalize();
-        // rotate by yaw only
-        dir.applyAxisAngle(new THREE.Vector3(0,1,0), controls.yaw);
-        vel.x += dir.x * acc * dt;
-        vel.z += dir.z * acc * dt;
+      if(e.code === "KeyE"){
+        if(currentTarget) currentTarget.action();
       }
 
-      // apply
-      camera.position.x += vel.x * dt;
-      camera.position.z += vel.z * dt;
-      camera.position.y += vel.y * dt;
-
-      // ground
-      if(camera.position.y < 1.7){
-        camera.position.y = 1.7;
-        vel.y = 0;
-        canJump = true;
-      }
-
-      collidePlayer();
-
-      // head bob (subtle)
-      const sp = Math.sqrt(vel.x*vel.x + vel.z*vel.z);
-      if(sp > 0.6){
-        camera.position.y += Math.sin(clock.elapsedTime * (move.run ? 12 : 9)) * 0.018;
+      if(e.code === "KeyT"){
+        speak(`${state.playerName}. do you remember why you came?`);
       }
     }
+    function onKeyUp(e){
+      if(e.code === "KeyW") moveF = false;
+      if(e.code === "KeyS") moveB = false;
+      if(e.code === "KeyA") moveL = false;
+      if(e.code === "KeyD") moveR = false;
+      if(e.code === "ShiftLeft" || e.code === "ShiftRight") sprint = false;
+    }
 
-    /* ----------------------------
-       ENEMY AI (billboard chase) + TV flicker
-    ---------------------------- */
-    function updateEnemies(dt, time){
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+
+    document.addEventListener("mousedown", async (e)=>{
+      if(!state.isPlaying) return;
+      await ensureAudio();
+      if(!controls.isLocked){
+        controls.lock();
+        return;
+      }
+      if(e.button === 0){
+        tryAttack();
+      }
+    });
+
+    // ========= LOOP =========
+    function applySanityAtmosphere(dt){
+      const s = state.sanity / 100;
+      const fear = 1 - s;
+
+      // Lights dim with sanity loss
+      hemi.intensity = lerp(0.22, 0.9, s);
+      keyLight.intensity = lerp(0.18, 0.9, s);
+
+      // Fog thickens
+      scene.fog.density = lerp(0.07, 0.018, s);
+
+      // Flashlight gets “twitchy” when low sanity
+      flashlight.intensity = lerp(2.6, 1.7, s) + Math.sin(performance.now()*0.008) * fear * 0.25;
+
+      // Overlays
+      vignette.style.opacity = String(lerp(0.62, 0.12, s));
+      scanlines.style.opacity = String(lerp(0.26, 0.08, s));
+      noiseOverlay.style.opacity = String(lerp(0.28, 0.00, s) * (0.55 + Math.random()*0.45));
+
+      // Renderer filter (subtle PS2 + glitch)
+      const g = clamp01(state.glitch + fear*0.35);
+      const hue = (fear > 0.55) ? (Math.random()*18 - 9) : 0;
+      const inv = (fear > 0.75 && Math.random() < 0.06) ? 1 : 0;
+      renderer.domElement.style.filter =
+        `contrast(${1.05 + g*0.45}) saturate(${1.06 - fear*0.35}) blur(${g*0.35}px) hue-rotate(${hue}deg) ${inv ? "invert(1)" : ""}`;
+
+      // Occasionally swap sky to “meadow” (your bright field) when sanity is low => uncanny contrast
+      if(fear > 0.62 && (loaded.back && Math.random() < 0.01)){
+        sky.material.map = loaded.back;
+        sky.material.needsUpdate = true;
+      } else if(fear < 0.5 && loaded.back2){
+        sky.material.map = loaded.back2;
+        sky.material.needsUpdate = true;
+      }
+
+      // Audio changes with sanity
+      if(audioCtx && droneGain){
+        droneGain.gain.value = lerp(0.28, 0.12, s) + fear*0.10;
+        // “wobble” pitch
+        if(droneOsc){
+          droneOsc.frequency.setValueAtTime(lerp(35, 46, s) + Math.sin(performance.now()*0.0016)*fear*4, audioCtx.currentTime);
+        }
+        // master volume a bit tighter when fear high
+        master.gain.value = lerp(0.62, 0.48, fear);
+      }
+    }
+
+    function enemyAI(dt){
+      const player = camera.position;
+      const s = state.sanity/100;
+      const fear = 1-s;
+
       for(const e of enemies){
-        const m = e.mesh;
+        e.phase += dt;
 
-        // billboard face camera (PS1/PS2 horror vibe)
-        m.lookAt(camera.position.x, m.position.y, camera.position.z);
+        // always face camera (billboard)
+        // sprite already faces camera, but we can “shiver”
+        const shiver = (Math.sin(e.phase*12.0) * 0.04) * (0.25 + fear);
+        e.mesh.position.y = 1.8 + shiver;
 
-        const d = m.position.distanceTo(camera.position);
+        const d = e.mesh.position.distanceTo(player);
+        const chaseRange = 18 + fear*10;
+        const hitRange = 1.7;
 
-        // a little “swim” motion
-        m.position.y = 1.1 + Math.sin((time + e.phase) * 1.4) * 0.05;
+        // become more aggressive as sanity drops
+        const aggressive = (fear > 0.4) ? 1.0 : 0.75;
 
-        if(d < e.aggro){
-          // chase
-          const toP = camera.position.clone().sub(m.position);
-          toP.y = 0;
-          toP.normalize();
+        if(d < chaseRange){
+          // move toward player
+          const dir = new THREE.Vector3().subVectors(player, e.mesh.position);
+          dir.y = 0;
+          dir.normalize();
 
-          // speed scales with sanity loss (more panic)
-          const panic = 1.0 + (1 - state.sanity/100) * 0.7;
-          m.position.x += toP.x * e.speed * panic * dt;
-          m.position.z += toP.z * e.speed * panic * dt;
+          const sp = e.speed * aggressive * (0.6 + e.aggro);
+          e.mesh.position.add(dir.multiplyScalar(sp * dt));
 
-          // pressure effects
-          if(d < 12 && Math.random() > 0.92){
-            // occasional whisper when near
-            const now = time;
-            if(now - state.lastWhisperAt > state.whisperCooldown){
-              state.lastWhisperAt = now;
-              whisper(`${state.playerName}...`);
+          // distortion at close range
+          if(d < 6){
+            e.mesh.material.opacity = 0.86 + Math.sin(performance.now()*0.02)*0.12;
+            if(Math.random() < 0.02*fear) state.glitch = Math.min(1, state.glitch + 0.08);
+          }
+
+          // damage
+          if(d < hitRange){
+            addHP(-12 * dt);
+            addSanity(-(7 * dt));
+            if(Math.random() < 0.01){
+              speak(`${state.playerName}…`);
             }
           }
-
-          if(d < e.hitDist){
-            state.hp = clamp(state.hp - 20 * dt, 0, 100);
-            state.sanity = clamp(state.sanity - 11 * dt, 0, 100);
-            state.glitchMode = 1;
-            if(audio) audio.setIntensity(0.7);
-            updateHUD();
-          }
-        }else{
-          // wander slowly
-          e.wanderT += dt;
-          m.position.x += Math.sin(e.wanderT*0.55) * 0.35 * dt;
-          m.position.z += Math.cos(e.wanderT*0.45) * 0.35 * dt;
+          e.aggro = Math.min(1, e.aggro + dt*0.2);
+        } else {
+          // wander
+          e.mesh.position.x += Math.sin(e.phase*0.7 + e.phase*0.1) * dt * 0.4;
+          e.mesh.position.z += Math.cos(e.phase*0.8) * dt * 0.4;
+          e.aggro = Math.max(0, e.aggro - dt*0.15);
+          e.mesh.material.opacity = 0.98;
         }
       }
-    }
 
-    function updateTVs(time){
-      for(const tv of tvs){
-        const u = tv.userData;
-        if(!u) continue;
-
-        // flicker behavior
-        const flick = (Math.sin((time + u.phase) * 6.0) + 1) * 0.5;
-        u.light.intensity = 0.6 + flick * 0.6 + (Math.random()-0.5)*0.08;
-
-        const showMsg = (Math.sin((time + u.phase) * 1.2) > 0.35);
-        u.screenMsg.material.opacity = showMsg ? 0.85 : 0.0;
-        u.screenStatic.material.opacity = showMsg ? 0.12 : 0.95;
-
-        // occasionally corrupt the TV message with name variations
-        if(Math.random() > 0.995){
-          const g = u.broadcast.ctx;
-          g.clearRect(0,0,256,256);
-          g.fillStyle = "#050505";
-          g.fillRect(0,0,256,256);
-          g.globalAlpha = 0.6;
-          g.drawImage(makeStaticCanvas(256,256), 0,0);
-          g.globalAlpha = 1;
-          g.fillStyle = "#f0f0f0";
-          g.font = "bold 18px Courier New";
-
-          const n = state.playerName;
-          const warped = n.split("").map(ch => Math.random()>0.8 ? "█" : ch).join("");
-          wrapText(g, `HELLO ${warped}\n\nSIGNAL: \n${Math.random()>0.5?"ERROR":"OK"}\n\nDO NOT\nSPEAK`, 16, 42, 224, 22);
-
-          u.broadcast.tex.needsUpdate = true;
-        }
+      // spawn reinforcements if you stay too long (keeps tension)
+      if(state.timeAlive > 70 && enemies.length < config.maxEnemies && Math.random() < 0.003 + fear*0.003){
+        spawnEnemy();
       }
-    }
-
-    /* ----------------------------
-       GLITCH FEEL
-    ---------------------------- */
-    function updateGlitch(time){
-      let g = 0;
-      if(state.glitchMode === 1) g = 0.35;
-      if(state.glitchMode === 2) g = 0.95;
-
-      // sanity-based micro-glitch
-      g = clamp(g + (1 - state.sanity/100) * 0.35, 0, 1);
-
-      // subtle camera roll in heavy glitch
-      const roll = (state.glitchMode === 2) ? (Math.sin(time*9.0) * 0.04 + (Math.random()-0.5)*0.03) : 0;
-      camera.rotation.z = roll;
-
-      postMat.uniforms.glitch.value = g;
-
-      // audio intensity ties to panic
-      if(audio){
-        const panic = clamp((1 - state.sanity/100) * 0.9 + (1 - state.hp/100) * 0.6, 0, 1);
-        audio.setIntensity(0.32 + panic * 0.55);
-      }
-    }
-
-    /* ----------------------------
-       HUD + DEATH
-    ---------------------------- */
-    function updateHUD(){
-      ui.hpBar.style.width = `${clamp(state.hp,0,100)}%`;
-      ui.sanBar.style.width = `${clamp(state.sanity,0,100)}%`;
-      ui.quest.textContent = "OBJECTIVE: " + state.objective;
-    }
-
-    function die(reason){
-      state.isPlaying = false;
-      state.paused = true;
-      unlockPointer();
-      ui.death.style.display = "flex";
-      ui.deathReason.textContent = reason;
-      if(audio){
-        audio.setIntensity(0.0);
-      }
-      whisper(`Disconnected, ${state.playerName}.`);
-    }
-
-    /* ----------------------------
-       MAIN LOOP
-    ---------------------------- */
-    function resize(){
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-
-      // update low-res RT
-      const w = Math.max(2, Math.floor(innerWidth * config.renderScale));
-      const h = Math.max(2, Math.floor(innerHeight * config.renderScale));
-      rt.setSize(w, h);
-    }
-    window.addEventListener("resize", resize);
-
-    function render(time){
-      // render scene into RT, then fullscreen post
-      renderer.setRenderTarget(rt);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      renderer.render(postScene, postCam);
     }
 
     function animate(){
       requestAnimationFrame(animate);
       if(!state.isPlaying) return;
 
-      const dt = Math.min(clock.getDelta(), 0.033); // clamp for stability
-      const time = clock.elapsedTime;
+      const dt = Math.min(0.033, clock.getDelta());
+      state.timeAlive += dt;
+      state.ttsCooldown = Math.max(0, state.ttsCooldown - dt);
 
-      // update
-      if(!state.paused){
-        updateLook(dt);
-        updateMovement(dt);
-        updateWeather(dt);
-        updateEnemies(dt, time);
-        updateTVs(time);
-        checkInteraction();
-        updateMinimap();
+      // sanity drains slowly over time (more if running)
+      const drain = 0.55 + (sprint ? 0.25 : 0) + (state.glitch*0.65);
+      addSanity(-drain * dt);
+
+      // glitch relaxes slowly
+      state.glitch = Math.max(0, state.glitch - dt*0.06);
+
+      // atmosphere changes
+      applySanityAtmosphere(dt);
+
+      // weather
+      updateWeather(dt);
+
+      // minimap (and lies)
+      drawMinimap();
+
+      // interaction
+      checkInteraction();
+
+      // move
+      if(controls.isLocked){
+        const prev = camera.position.clone();
+
+        // gravity
+        vel.y -= 14.0 * dt;
+
+        const speed = (sprint ? 7.0 : 4.7) * (0.82 + (state.sanity/100)*0.18);
+        const forward = (moveF ? 1 : 0) - (moveB ? 1 : 0); // FIXED
+        const right = (moveR ? 1 : 0) - (moveL ? 1 : 0);
+
+        // friction
+        vel.x *= (1 - 8*dt);
+        vel.z *= (1 - 8*dt);
+
+        // apply input
+        vel.z -= forward * speed * 9.0 * dt;
+        vel.x -= right * speed * 9.0 * dt;
+
+        controls.moveForward(-vel.z * dt);
+        controls.moveRight(-vel.x * dt);
+
+        camera.position.y += vel.y * dt;
+
+        // floor
+        if(camera.position.y < 1.7){
+          camera.position.y = 1.7;
+          vel.y = 0;
+          canJump = true;
+        }
+
+        // collision resolve
+        resolveCollisions(prev);
+
+        // head bob (responsive)
+        if(Math.abs(forward) + Math.abs(right) > 0){
+          const bob = Math.sin(state.timeAlive*10.5) * 0.035 * (sprint ? 1.25 : 1.0);
+          camera.position.y += bob;
+        }
       }
 
-      postMat.uniforms.time.value = time;
-      updateGlitch(time);
+      // animate name graffiti
+      for(const d of decals){
+        d.tick(state.timeAlive + d.wobble);
+        // subtle pulse when sanity low
+        const s = state.sanity/100;
+        d.mesh.material.opacity = lerp(0.98, 0.78, 1-s) + Math.sin(state.timeAlive*2.0 + d.wobble)*0.03;
+      }
 
-      // death conditions
-      if(state.hp <= 0) die("PHYSICAL TRAUMA CRITICAL");
-      if(state.sanity <= 0) die("SYSTEM CORRUPTION 100%");
+      // enemies
+      enemyAI(dt);
 
-      render(time);
+      // TV flicker (if present)
+      for(const it of interactables){
+        if(it.mesh?.userData?.type === "tv"){
+          const tv = it.mesh;
+          const u = tv.userData;
+          if(u.light){
+            u.light.intensity = 0.6 + Math.random()*0.9;
+          }
+          if(u.screen?.material?.map){
+            u.screen.material.map.offset.set(Math.random()*0.02, Math.random()*0.02);
+          }
+        }
+      }
+
+      // render
+      renderer.render(scene, camera);
+
+      // death
+      if(state.hp <= 0 || state.sanity <= 0){
+        state.isPlaying = false;
+        document.exitPointerLock?.();
+        document.getElementById("death-screen").style.display = "flex";
+        document.getElementById("death-reason").innerText =
+          (state.hp <= 0) ? "PHYSICAL TRAUMA CRITICAL" : "SYSTEM CORRUPTION 100% — YOU BELIEVED THE WALLS.";
+      }
     }
 
-    /* ----------------------------
-       INPUTS
-    ---------------------------- */
-    document.addEventListener("keydown", (e) => {
-      if(!state.isPlaying) return;
+    // ========= START =========
+    document.getElementById("start-btn").addEventListener("click", async ()=>{
+      const input = document.getElementById("name-input").value.trim();
+      state.playerName = input ? input.toUpperCase() : "NO-ONE";
+      updateBars();
 
-      if(e.code === "Escape"){
-        // toggle pause-ish
-        if(controls.locked) unlockPointer();
-        else if(!ui.note.style.display || ui.note.style.display === "none") lockPointer();
-        return;
-      }
-
-      if(state.paused) return;
-
-      switch(e.code){
-        case "KeyW": move.f = true; break;
-        case "KeyS": move.b = true; break;
-        case "KeyA": move.l = true; break;
-        case "KeyD": move.r = true; break;
-        case "ShiftLeft":
-        case "ShiftRight": move.run = true; break;
-        case "Space":
-          if(canJump){
-            vel.y = config.jumpVel;
-            canJump = false;
-            if(audio) audio.thump();
-          }
-          break;
-        case "KeyE":
-          if(currentTarget && currentTarget.action){
-            currentTarget.action();
-          }
-          break;
-      }
-    });
-
-    document.addEventListener("keyup", (e) => {
-      switch(e.code){
-        case "KeyW": move.f = false; break;
-        case "KeyS": move.b = false; break;
-        case "KeyA": move.l = false; break;
-        case "KeyD": move.r = false; break;
-        case "ShiftLeft":
-        case "ShiftRight": move.run = false; break;
-      }
-    });
-
-    // click to lock
-    renderer.domElement.addEventListener("click", () => {
-      if(!state.isPlaying) return;
-      if(ui.note.style.display === "block") return;
-      lockPointer();
-    });
-
-    /* ----------------------------
-       START
-    ---------------------------- */
-    function startGame(){
-      ensureAudio();
-      audio.ctx.resume?.();
-
-      state.playerName = (ui.nameInput.value || "").trim().slice(0,18) || "UNKNOWN";
-      setObjective("FIND THE SERVER ROOM KEY");
-      state.hp = 100; state.sanity = 100;
-      state.gotKey = false;
-      state.inventory.clear();
-      state.glitchMode = 0;
-      state.lastWhisperAt = 0;
-
-      updateHUD();
-
-      ui.start.style.display = "none";
-      ui.death.style.display = "none";
-      ui.note.style.display = "none";
-
+      document.getElementById("start-screen").style.display = "none";
       state.isPlaying = true;
-      state.paused = false;
 
-      generateCity();
-      rainSystem = initRain();
+      // world + start
+      generateWorld();
+      camera.position.set(6, 1.7, 6);
 
-      // spawn position
-      camera.position.set(5, 1.7, 5);
-      controls.yaw = 0; controls.pitch = 0;
-      camera.rotation.set(0,0,0);
+      await ensureAudio();
+      controls.lock();
 
-      resize();
-      lockPointer();
-
-      whisper(`Welcome, ${state.playerName}.`);
+      speak(`Welcome, ${state.playerName}.`);
       animate();
-    }
+    });
 
-    document.getElementById("start-btn").addEventListener("click", startGame);
+    window.addEventListener("resize", ()=>{
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
 
-    // initial HUD
-    updateHUD();
-    resize();
+    // Start with stable mouse: no roll jitter (we never add camera.rotation.z now)
+    // If you want even smoother feel, you can lower pointer speed by scaling movement (handled by browser).
   </script>
 </body>
 </html>
+
 
 
 
